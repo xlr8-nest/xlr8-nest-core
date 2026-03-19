@@ -1,0 +1,25 @@
+# Source files
+*.ts
+!*.d.ts
+tsconfig.json
+tsup.config.ts
+
+# Development
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Test files
+*.spec.ts
+*.test.ts
+__tests__
+coverage
+
+# Misc
+*.log
+*.md
+!README.md
+.DS_Store
+Thumbs.db
