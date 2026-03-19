@@ -8,15 +8,84 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
 
-      - run: npm ci
-      - run: npm run build
-      - run: npm publish --access public
+      - name: Extract version from tag
+        id: tag_version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Git tag version: $TAG_VERSION"
+
+      - name: Extract version from package.json
+        id: package_version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Package.json version: $PACKAGE_VERSION"
+
+      - name: Verify version match
+        run: |
+          TAG_VERSION="${{ steps.tag_version.outputs.version }}"
+          PACKAGE_VERSION="${{ steps.package_version.outputs.version }}"
+
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "❌ ERROR: Version mismatch!"
+            echo "   Git tag version:     v$TAG_VERSION"
+            echo "   package.json version: $PACKAGE_VERSION"
+            echo ""
+            echo "Please ensure the git tag matches the package.json version."
+            echo "Expected tag: v$PACKAGE_VERSION"
+            exit 1
+          fi
+
+          echo "✅ Version verified: $TAG_VERSION"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Build package
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.tag_version.outputs.version }}
+          body: |
+            ## 🚀 Release ${{ steps.tag_version.outputs.version }}
+
+            ### 📦 Installation
+            ```bash
+            npm install @xlr8-nest/core@${{ steps.tag_version.outputs.version }}
+            ```
+
+            ### 📝 Changes
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            ### 🔗 Links
+            - [npm Package](https://www.npmjs.com/package/@xlr8-nest/core/v/${{ steps.tag_version.outputs.version }})
+            - [Documentation](https://github.com/${{ github.repository }}#readme)
+          draft: false
+          prerelease: ${{ contains(steps.tag_version.outputs.version, '-') }}
