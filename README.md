@@ -431,6 +431,6 @@ MIT © [Your Name]
 ## 🔗 Links
 
 - [npm Package](https://www.npmjs.com/package/@xlr8-nest/core)
-- [GitHub Repository](#)
-- [Documentation](#)
-- [Issues](#)
+- [GitHub Repository](https://github.com/xlr8-nest/xlr8-nest-core)
+- [Documentation](https://github.com/xlr8-nest/xlr8-nest-core#readme)
+- [Issues](https://github.com/xlr8-nest/xlr8-nest-core/issues)

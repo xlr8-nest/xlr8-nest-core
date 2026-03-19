@@ -41,5 +41,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized error classes
 - Full TypeScript support with comprehensive type definitions
 
-[0.1.0]: https://github.com/your-org/xlr8-nest-core/compare/v0.0.1...v0.1.0
-[0.0.1]: https://github.com/your-org/xlr8-nest-core/releases/tag/v0.0.1
+[0.1.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.0.1...v0.1.0
+[0.0.1]: https://github.com/xlr8-nest/xlr8-nest-core/releases/tag/v0.0.1
