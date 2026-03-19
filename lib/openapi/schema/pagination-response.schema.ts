@@ -5,14 +5,14 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class PaginationMetaSchema {
   @ApiProperty({ description: 'Total number of items', example: 100 })
-  total: number;
+  total!: number;
 
   @ApiProperty({ description: 'Items per page', example: 10 })
-  perPage: number;
+  perPage!: number;
 
   @ApiProperty({ description: 'Current page number', example: 1 })
-  currentPage: number;
+  currentPage!: number;
 
   @ApiProperty({ description: 'Last page number', example: 10 })
-  lastPage: number;
+  lastPage!: number;
 }
