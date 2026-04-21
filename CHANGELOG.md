@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-04-21
+
+### Changed
+- Added `@swc/core` to the build toolchain so `tsup` can preserve NestJS decorator metadata during compilation
+
+### Fixed
+- Fixed published builds losing `design:paramtypes` metadata required by NestJS dependency injection
+- Fixed `nest-commander` command runners failing at runtime because injected services were `undefined`
+- Fixed migration and seeder CLI commands in consumer apps built against the published package
+
 ## [0.1.0] - 2026-03-19
 
 ### Added
@@ -41,5 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized error classes
 - Full TypeScript support with comprehensive type definitions
 
+[0.1.3]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.0...v0.1.3
 [0.1.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/xlr8-nest/xlr8-nest-core/releases/tag/v0.0.1
