@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { DatabaseModuleConfig } from '../types';
-import { DATABASE_MODULE_CONFIG } from '../constants/database.constants';
+import { DATABASE_MODULE_CONFIG } from '../constants';
 import { createMigrationFile, prettifyQuery, queryParams } from '../utils';
 
 @Injectable()

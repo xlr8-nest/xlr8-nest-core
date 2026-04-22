@@ -2,9 +2,8 @@ import { DynamicModule, Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { IUnitOfWorkToken, type DatabaseModuleConfig } from './types';
 import { MigrationService, SeederService } from './services';
-import { MigrationCommandRunner } from './command/migration.command';
-import { SeederCommandRunner } from './command/seeder.command';
-import { DATABASE_MODULE_CONFIG } from './constants/database.constants';
+import { MigrationCommandRunner, SeederCommandRunner } from './commands';
+import { DATABASE_MODULE_CONFIG } from './constants';
 import { TypeOrmClient } from './providers';
 
 export interface DatabaseExtensionAsyncOptions {

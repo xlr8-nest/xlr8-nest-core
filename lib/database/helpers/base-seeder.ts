@@ -1,13 +1,7 @@
-import { DataSource } from 'typeorm';
+import { Seeder } from '../types';
 
 /**
- * Abstract base class for database seeders
- * Implement the run() method to define your seeding logic
+ * User-facing seeder base class.
+ * Keeps the familiar BaseSeeder name while staying compatible with SeederService.
  */
-export abstract class BaseSeeder {
-  /**
-   * Run the seeder
-   * @param dataSource - TypeORM DataSource instance
-   */
-  abstract run(dataSource: DataSource): Promise<void>;
-}
+export abstract class BaseSeeder extends Seeder {}

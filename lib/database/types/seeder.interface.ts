@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
 /**
  * Abstract base class for seeders
@@ -6,6 +6,10 @@ import { DataSource } from 'typeorm';
  */
 export abstract class Seeder {
   constructor(protected readonly dataSource: DataSource) {}
+
+  protected get manager(): EntityManager {
+    return this.dataSource.manager;
+  }
 
   /**
    * Run the seeder

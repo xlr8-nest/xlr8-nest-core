@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
 import type { DatabaseModuleConfig, Seeder, SeederOptions, SeederConstructor } from '../types';
-import { DATABASE_MODULE_CONFIG } from '../constants/database.constants';
+import { DATABASE_MODULE_CONFIG } from '../constants';
 
 @Injectable()
 export class SeederService {
