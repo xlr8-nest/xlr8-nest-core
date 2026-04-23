@@ -7,12 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-23
+
+First stable release of `@xlr8-nest/core`, focused on standardizing API contracts, improving TypeScript safety, and simplifying the OpenAPI integration surface.
+
+### Added
+- Added a new `response` submodule with `buildSuccessResponse`, `buildErrorResponse`, and `buildExceptionErrorResponse`
+- Added controller-friendly response aliases: `ApiSuccess<T>`, `ApiFailure<TErrors>`, and `ApiResult<TData, TErrors>`
+- Added HTTP method-based OpenAPI decorators: `ApiMethod`, `ApiPost`, `ApiGet`, `ApiPatch`, `ApiPut`, and `ApiDelete`
+- Added custom OpenAPI wrapper factories for both success and error responses while preserving the default wrapped response format
+
 ### Changed
-- Breaking: replaced semantic OpenAPI decorators with HTTP method-based decorators: `ApiPost`, `ApiGet`, `ApiPatch`, `ApiPut`, `ApiDelete`, and `ApiMethod`
-- Added custom OpenAPI wrapper factories for both success and error responses while keeping the default wrapped response format
+- Breaking: replaced semantic OpenAPI decorators with HTTP method-based decorators and promoted `ApiMethod` as the generic entrypoint
+- Updated `ApiWrappedResponse` to accept richer options for array, paginated, and custom wrapper scenarios
 - Standardized OpenAPI error schemas so `errors` is documented as a field-keyed object map
-- Added a new `response` submodule with type-safe builders for success responses and exception-filter error responses
-- Made library error classes type-safe by removing `any` error payloads and adding `statusCode` to `BaseError`
+- Improved type safety across response builders, custom errors, DDD buses, and database helpers
+- Expanded README examples to show recommended response return types for controllers and exception filters
+
+### Removed
+- Removed semantic OpenAPI decorators: `ApiCreate`, `ApiGetOne`, `ApiGetMany`, `ApiGetPaginated`, `ApiUpdate`, and `ApiAction`
+
+### Fixed
+- Fixed lint issues across the database and DDD modules
+- Fixed package exports and build output for the new `response` submodule
+- Fixed wrapped error normalization so exception filters can safely build consistent error payloads from `BaseError`, `HttpException`, and generic `Error`
 
 ### Migration
 - `ApiCreate` -> `ApiPost`
@@ -21,6 +39,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ApiGetPaginated` -> `ApiGet(..., { paginated: true })`
 - `ApiUpdate` -> `ApiPatch` or `ApiPut`
 - `ApiAction` -> `ApiMethod`
+
+## [0.1.6] - 2026-04-22
+
+### Changed
+- Updated package metadata for the `0.1.6` release
+
+## [0.1.5] - 2026-04-22
+
+### Changed
+- Updated package metadata for the `0.1.5` release
+
+## [0.1.4] - 2026-04-22
+
+### Added
+- Added migration and seeder command runners to the database module
+
+### Changed
+- Renamed the internal database command entrypoint from `command` to `commands`
+- Expanded database exports and typing around migration, seeder, and unit-of-work helpers
+
+### Fixed
+- Improved database module wiring for migration and seeder services
 
 ## [0.1.3] - 2026-04-21
 
@@ -68,7 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized error classes
 - Full TypeScript support with comprehensive type definitions
 
+[1.0.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.6...v1.0.0
+[0.1.6]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.0...v0.1.3
 [0.1.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/xlr8-nest/xlr8-nest-core/releases/tag/v0.0.1
-[Unreleased]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v1.0.0...HEAD
