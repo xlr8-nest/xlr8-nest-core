@@ -1,4 +1,4 @@
-import { CompositeKey, Identifier } from './type';
+import { CompositeKey, Identifier, KeyPart } from './type';
 
 export abstract class Entity<T extends Identifier>{
   protected readonly _id: T;
@@ -24,7 +24,7 @@ export abstract class Entity<T extends Identifier>{
       if(!(other._id instanceof CompositeKey)){
         return false;
       }
-      return this._id.equals(other._id as CompositeKey<any>);
+      return this._id.equals(other._id as CompositeKey<readonly KeyPart[]>);
     }
     return this._id === other._id;
   }

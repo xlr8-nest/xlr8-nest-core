@@ -62,6 +62,16 @@
         "default": "./dist/openapi/index.js"
       }
     },
+    "./response": {
+      "import": {
+        "types": "./dist/response/index.d.mts",
+        "default": "./dist/response/index.mjs"
+      },
+      "require": {
+        "types": "./dist/response/index.d.ts",
+        "default": "./dist/response/index.js"
+      }
+    },
     "./types": {
       "import": {
         "types": "./dist/types/index.d.mts",

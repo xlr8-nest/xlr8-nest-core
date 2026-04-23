@@ -104,19 +104,19 @@ export class AppModule {}
 
 ```typescript
 import { Controller, Get, Post, Body } from '@nestjs/common';
-import { ApiCreate, ApiGetPaginated } from '@xlr8-nest/core/openapi';
+import { ApiGet, ApiPost } from '@xlr8-nest/core/openapi';
 import { CreateUserDto, UserDto } from './dto';
 
 @Controller('users')
 export class UserController {
   @Post()
-  @ApiCreate(UserDto, { summary: 'Create a new user' })
+  @ApiPost(UserDto, { summary: 'Create a new user' })
   async create(@Body() dto: CreateUserDto) {
     return this.userService.create(dto);
   }
 
   @Get()
-  @ApiGetPaginated(UserDto, { summary: 'Get paginated users' })
+  @ApiGet(UserDto, { summary: 'Get paginated users', paginated: true })
   async findAll() {
     return this.userService.findAll();
   }
@@ -315,21 +315,38 @@ Swagger documentation decorators with standardized response format.
 
 ```typescript
 import {
-  ApiCreate,
-  ApiGetOne,
-  ApiGetMany,
-  ApiGetPaginated,
-  ApiUpdate,
   ApiDelete,
-  ApiError
+  ApiGet,
+  ApiMethod,
+  ApiPatch,
+  ApiPost,
+  ApiPut,
+  ApiError,
+  ApiBadRequest,
+  ApiConflict,
+  ApiNotFound
 } from '@xlr8-nest/core/openapi';
 ```
 
 **Features:**
-- Pre-configured endpoint decorators with wrapped response format
+- HTTP method-based decorators with wrapped response format
 - Error response decorators
-- Pagination support
+- Custom success/error wrapper factories
+- Pagination support via `ApiGet(..., { paginated: true })`
 - Automatic schema generation
+
+**Breaking change migration:**
+
+| Removed decorator | Use instead |
+|---------|-------------------|
+| `ApiCreate` | `ApiPost` |
+| `ApiGetOne` | `ApiGet` |
+| `ApiGetMany` | `ApiGet(..., { isArray: true })` |
+| `ApiGetPaginated` | `ApiGet(..., { paginated: true })` |
+| `ApiUpdate` | `ApiPatch` or `ApiPut` |
+| `ApiAction` | `ApiMethod` |
+
+`ApiDelete` is still available, but it now follows the HTTP method-based API and defaults to `200`.
 
 **Example:**
 
@@ -338,27 +355,78 @@ import {
 @ApiTags('users')
 export class UserController {
   @Post()
-  @ApiCreate(UserDto, {
+  @ApiPost(UserDto, {
     summary: 'Create a new user',
     description: 'Creates a new user with the provided data'
   })
-  @ApiError([BadRequestError, ConflictError])
+  @ApiBadRequest({
+    code: 'VALIDATION_ERROR',
+    message: 'Invalid input data',
+    includeErrors: true
+  })
+  @ApiConflict({
+    code: 'USER_EMAIL_EXISTS',
+    message: 'Email already registered'
+  })
   async create(@Body() dto: CreateUserDto) {
     return this.userService.create(dto);
   }
 
   @Get(':id')
-  @ApiGetOne(UserDto, { summary: 'Get user by ID' })
-  @ApiError([NotFoundError])
+  @ApiGet(UserDto, { summary: 'Get user by ID' })
+  @ApiNotFound()
   async findOne(@Param('id') id: string) {
     return this.userService.findById(id);
   }
 
   @Get()
-  @ApiGetPaginated(UserDto, { summary: 'Get paginated users' })
+  @ApiGet(UserDto, { summary: 'Get paginated users', paginated: true })
   async findAll(@Query() query: PaginationDto) {
     return this.userService.findAll(query);
   }
+}
+```
+
+### 5. Response Builders
+
+```typescript
+import { buildSuccessResponse } from '@xlr8-nest/core/response';
+
+@Get(':id')
+async findOne(@Param('id') id: string) {
+  const user = await this.userService.findById(id);
+  return buildSuccessResponse(user, {
+    message: 'User retrieved successfully',
+  });
+}
+```
+
+**Custom wrapper example:**
+
+```typescript
+const auditWrapper = ({ defaultSchema, defaultExtraModels }) => ({
+  schema: {
+    ...defaultSchema,
+    properties: {
+      ...defaultSchema.properties,
+      traceId: { type: 'string', example: 'req_123' },
+    },
+    required: [...(defaultSchema.required ?? []), 'traceId'],
+  },
+  extraModels: defaultExtraModels,
+});
+
+@Post()
+@ApiPost(UserDto, {
+  summary: 'Create user',
+  wrapper: auditWrapper,
+})
+@ApiBadRequest({
+  includeErrors: true,
+  wrapper: auditWrapper,
+})
+async create(@Body() dto: CreateUserDto) {
+  return this.userService.create(dto);
 }
 ```
 
@@ -368,12 +436,99 @@ Shared TypeScript types and interfaces.
 
 ```typescript
 import {
-  ApiResponse,
-  SuccessApiResponse,
-  ErrorApiResponse,
+  Response,
+  SuccessResponse,
+  ErrorResponse,
+  ApiResult,
+  ApiSuccess,
+  ApiFailure,
   UserIdentity,
   PaginationMeta
 } from '@xlr8-nest/core/types';
+```
+
+### 📦 Response (`@xlr8-nest/core/response`)
+
+Response builders for standardized success/error payloads.
+
+```typescript
+import {
+  buildSuccessResponse,
+  buildErrorResponse,
+  buildExceptionErrorResponse,
+  type ApiResult,
+  type ApiSuccess,
+  type ApiFailure,
+  type SuccessResponse,
+} from '@xlr8-nest/core/response';
+```
+
+**Features:**
+- Type-safe success response builder for controller/service returns
+- Type-safe error response builder for manual error payloads
+- Exception filter helper that normalizes `BaseError`, Nest `HttpException`, and unknown errors
+- Short aliases for controller signatures: `ApiSuccess<T>`, `ApiFailure<T>`, `ApiResult<T>`
+
+**Recommended naming for controller return types:**
+- Prefer `ApiSuccess<T>` when the controller method only returns the success body.
+- Prefer `ApiResult<T>` when you want one shared API contract type across app layers or tests.
+- Avoid using bare `Response<T>` in controllers if your app also imports Nest/Express `Response`, because the name can be confusing.
+
+**Example:**
+
+```typescript
+@Controller('users')
+export class UserController {
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<ApiSuccess<UserDto>> {
+    const user = await this.userService.findById(id);
+
+    return buildSuccessResponse(user, {
+      message: 'User retrieved successfully',
+    });
+  }
+
+  @Get()
+  async findAll(): Promise<ApiSuccess<UserDto[]>> {
+    const users = await this.userService.findAll();
+
+    return buildSuccessResponse(users);
+  }
+}
+```
+
+**Shared contract example:**
+
+```typescript
+import { buildSuccessResponse, type ApiResult } from '@xlr8-nest/core/response';
+
+@Injectable()
+export class UserFacade {
+  async findOne(id: string): Promise<ApiResult<UserDto>> {
+    const user = await this.userService.findById(id);
+
+    return buildSuccessResponse(user, {
+      message: 'User retrieved successfully',
+    });
+  }
+}
+```
+
+**Exception filter example:**
+
+```typescript
+import { buildExceptionErrorResponse, type ApiFailure } from '@xlr8-nest/core/response';
+
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const response = host.switchToHttp().getResponse();
+    const { statusCode, body } = buildExceptionErrorResponse(exception);
+    const payload: ApiFailure = body;
+
+    response.status(statusCode).json(payload);
+  }
+}
 ```
 
 ### ✅ Validator (`@xlr8-nest/core/validator`)
@@ -414,6 +569,7 @@ This package requires the following peer dependencies based on which modules you
 | **ddd** | `@nestjs/common`, `@nestjs/core`, `rxjs` | `@nestjs/event-emitter` |
 | **database** | `@nestjs/common`, `@nestjs/core` | `@nestjs/typeorm`, `typeorm` |
 | **openapi** | `@nestjs/common` | `@nestjs/swagger` |
+| **response** | `@nestjs/common` | - |
 | **validator** | `@nestjs/common` | `zod` |
 | **errors** | `@nestjs/common` | - |
 | **types** | - | - |

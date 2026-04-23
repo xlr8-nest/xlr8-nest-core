@@ -3,6 +3,7 @@ export * from '../ddd';
 export * from '../database';
 export * from '../errors';
 export * from '../openapi';
+export * from '../response';
 export * from '../types';
 export * from '../validator';
 

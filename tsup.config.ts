@@ -7,6 +7,7 @@ export default defineConfig({
     'database/index': 'lib/database/index.ts',
     'errors/index': 'lib/errors/index.ts',
     'openapi/index': 'lib/openapi/index.ts',
+    'response/index': 'lib/response/index.ts',
     'types/index': 'lib/types/index.ts',
     'validator/index': 'lib/validator/index.ts',
   },

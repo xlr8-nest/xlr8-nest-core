@@ -1,3 +1,6 @@
+import type { LoggerOptions } from 'typeorm';
+import type { SeederConstructor } from './seeder.interface';
+
 export enum DatabaseType {
   POSTGRES = 'postgres',
   MYSQL = 'mysql',
@@ -5,6 +8,10 @@ export enum DatabaseType {
   SQLITE = 'sqlite',
   MSSQL = 'mssql',
 }
+
+export type TypeOrmClass = abstract new (...args: never[]) => object;
+export type EntityDefinition = string | TypeOrmClass;
+export type MigrationDefinition = string | TypeOrmClass;
 
 export interface DatabaseConnectionConfig {
   type: DatabaseType;
@@ -15,7 +22,7 @@ export interface DatabaseConnectionConfig {
   database?: string;
   url?: string;
   synchronize?: boolean;
-  logging?: boolean | string[];
+  logging?: LoggerOptions;
 }
 
 export interface MigrationConfig {
@@ -27,13 +34,13 @@ export interface MigrationConfig {
 
 export interface SeederConfig {
   enabled?: boolean;
-  seeds?: any[];  // Array of seeder class constructors
+  seeds?: SeederConstructor[];
   autoRun?: boolean;
 }
 
 export interface DatabaseModuleConfig {
   connection: DatabaseConnectionConfig;
-  entities: string[];
+  entities: EntityDefinition[];
   migration?: MigrationConfig;
   seeder?: SeederConfig;
 }

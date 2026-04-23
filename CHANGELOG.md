@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Breaking: replaced semantic OpenAPI decorators with HTTP method-based decorators: `ApiPost`, `ApiGet`, `ApiPatch`, `ApiPut`, `ApiDelete`, and `ApiMethod`
+- Added custom OpenAPI wrapper factories for both success and error responses while keeping the default wrapped response format
+- Standardized OpenAPI error schemas so `errors` is documented as a field-keyed object map
+- Added a new `response` submodule with type-safe builders for success responses and exception-filter error responses
+- Made library error classes type-safe by removing `any` error payloads and adding `statusCode` to `BaseError`
+
+### Migration
+- `ApiCreate` -> `ApiPost`
+- `ApiGetOne` -> `ApiGet`
+- `ApiGetMany` -> `ApiGet(..., { isArray: true })`
+- `ApiGetPaginated` -> `ApiGet(..., { paginated: true })`
+- `ApiUpdate` -> `ApiPatch` or `ApiPut`
+- `ApiAction` -> `ApiMethod`
+
 ## [0.1.3] - 2026-04-21
 
 ### Changed
@@ -54,3 +71,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.3]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.0...v0.1.3
 [0.1.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/xlr8-nest/xlr8-nest-core/releases/tag/v0.0.1
+[Unreleased]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.3...HEAD

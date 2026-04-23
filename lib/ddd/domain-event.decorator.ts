@@ -2,6 +2,17 @@ import 'reflect-metadata';
 import { OnEvent } from '@nestjs/event-emitter';
 
 const EVENT_NAME_METADATA = Symbol('EVENT_NAME_METADATA');
+type EventConstructor = new (...args: never[]) => object;
+
+interface EventLike {
+  constructor?: { name?: string };
+  name?: string;
+  prototype?: object;
+}
+
+const isMetadataTarget = (value: unknown): value is object => {
+  return (typeof value === 'object' && value !== null) || typeof value === 'function';
+};
 
 /**
  * Decorator để đánh dấu một class là Domain Event và định nghĩa event name
@@ -30,31 +41,43 @@ const EVENT_NAME_METADATA = Symbol('EVENT_NAME_METADATA');
  * ```
  */
 export function Event(eventName?: string): ClassDecorator {
-  return (target: any) => {
-    const name = eventName || target.name;
-    Reflect.defineMetadata(EVENT_NAME_METADATA, name, target);
-    Reflect.defineMetadata(EVENT_NAME_METADATA, name, target.prototype);
+  return (target) => {
+    const eventTarget = target as unknown as EventConstructor;
+    const name = eventName || eventTarget.name;
+    Reflect.defineMetadata(EVENT_NAME_METADATA, name, eventTarget);
+    Reflect.defineMetadata(EVENT_NAME_METADATA, name, eventTarget.prototype);
   };
 }
 
 /**
  * Lấy event name từ event class hoặc instance
  */
-export function getEventName(eventOrClass: any): string {
+export function getEventName(eventOrClass: unknown): string {
+  const event = eventOrClass as EventLike;
+  const constructorTarget = isMetadataTarget(event.constructor) ? event.constructor : undefined;
+  const prototypeTarget = isMetadataTarget(event.prototype) ? event.prototype : undefined;
+  const eventTarget = isMetadataTarget(eventOrClass) ? eventOrClass : undefined;
+
   // Thử lấy từ instance
-  const fromInstance = Reflect.getMetadata(EVENT_NAME_METADATA, eventOrClass.constructor);
+  const fromInstance = constructorTarget
+    ? Reflect.getMetadata(EVENT_NAME_METADATA, constructorTarget)
+    : undefined;
   if (fromInstance) return fromInstance;
   
   // Thử lấy từ prototype
-  const fromPrototype = Reflect.getMetadata(EVENT_NAME_METADATA, eventOrClass);
+  const fromPrototype = eventTarget
+    ? Reflect.getMetadata(EVENT_NAME_METADATA, eventTarget)
+    : undefined;
   if (fromPrototype) return fromPrototype;
   
   // Thử lấy từ class
-  const fromClass = Reflect.getMetadata(EVENT_NAME_METADATA, eventOrClass.prototype || eventOrClass);
+  const fromClass = prototypeTarget
+    ? Reflect.getMetadata(EVENT_NAME_METADATA, prototypeTarget)
+    : undefined;
   if (fromClass) return fromClass;
   
   // Fallback: dùng class name
-  return eventOrClass.constructor?.name || eventOrClass.name || 'UnknownEvent';
+  return event.constructor?.name || event.name || 'UnknownEvent';
 }
 
 /**
@@ -80,7 +103,7 @@ export function getEventName(eventOrClass: any): string {
  * }
  * ```
  */
-export function EventHandler(eventClassOrName: any) {
+export function EventHandler(eventClassOrName: string | EventConstructor) {
   // Xác định event name từ class hoặc string
   const eventName = typeof eventClassOrName === 'string' 
     ? eventClassOrName 

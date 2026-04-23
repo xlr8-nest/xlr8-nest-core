@@ -16,7 +16,7 @@ export class MigrationCommandRunner extends CommandRunner {
     super();
   }
 
-  async run(passedParams: string[], options?: GenerateOptions): Promise<void> {
+  async run(passedParams: string[], _options?: GenerateOptions): Promise<void> {
     const command = passedParams[0];
 
     switch (command) {
@@ -86,9 +86,12 @@ export class MigrationCommandRunner extends CommandRunner {
 
     if (executed.length > 0) {
       console.log(`Total: ${executed.length}\n`);
-      executed.forEach((m: any, index: number) => {
-        console.log(`${index + 1}. ${m.name}`);
-        console.log(`   Timestamp: ${new Date(parseInt(m.timestamp)).toISOString()}`);
+      executed.forEach((migration, index) => {
+        const timestamp = typeof migration.timestamp === 'number'
+          ? migration.timestamp
+          : parseInt(migration.timestamp, 10);
+        console.log(`${index + 1}. ${migration.name}`);
+        console.log(`   Timestamp: ${new Date(timestamp).toISOString()}`);
       });
     } else {
       console.log('(no executed migrations)');

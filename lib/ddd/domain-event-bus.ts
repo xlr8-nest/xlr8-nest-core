@@ -22,6 +22,24 @@ export interface ISaga<TEvent extends DomainEvent = DomainEvent> {
 
 export const SAGA_METADATA = '__saga__';
 
+type EventConstructor<TEvent extends DomainEvent> = new (...args: never[]) => TEvent;
+
+interface CommandBusLike {
+  execute(command: ICommand): Promise<unknown>;
+}
+
+interface ProviderWrapperLike {
+  instance?: object;
+}
+
+interface ModuleProviderMap {
+  providers: Map<unknown, ProviderWrapperLike>;
+}
+
+interface NestContainerLike {
+  getModules(): Map<unknown, ModuleProviderMap>;
+}
+
 /**
  * Domain Event Bus - Adapter cho NestJS EventEmitter2
  * Sử dụng @EventHandler decorator để đánh dấu handlers, NestJS sẽ tự động đăng ký
@@ -61,22 +79,22 @@ export const SAGA_METADATA = '__saga__';
 export class DomainEventBus implements IDomainEventBus, OnModuleInit {
   private readonly logger = new Logger(DomainEventBus.name);
   private readonly subject$ = new Subject<DomainEvent>();
-  private sagas: ISaga[] = [];
-  private commandBus: any; // Lazy injection to avoid circular dependency
+  private sagas: Array<ISaga<DomainEvent>> = [];
+  private commandBus?: CommandBusLike;
 
   constructor(
     private readonly eventEmitter: EventEmitter2,
     private readonly moduleRef: ModuleRef,
   ) { }
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     await this.setupSagas();
   }
 
   /**
    * Set CommandBus (lazy injection)
    */
-  setCommandBus(commandBus: any) {
+  setCommandBus(commandBus: CommandBusLike): void {
     this.commandBus = commandBus;
   }
 
@@ -111,33 +129,36 @@ export class DomainEventBus implements IDomainEventBus, OnModuleInit {
    * Subscribe to specific event type
    */
   subscribe<T extends DomainEvent>(
-    eventType: new (...args: any[]) => T,
-    handler: (event: T) => void,
+    eventType: EventConstructor<T>,
+    handler: DomainEventHandler<T>,
   ): Subscription {
     return this.subject$
-      .pipe(filter((event) => event instanceof eventType))
-      .subscribe(handler as any);
+      .pipe(filter((event): event is T => event instanceof eventType))
+      .subscribe((event) => {
+        void Promise.resolve(handler(event));
+      });
   }
 
   /**
    * Register a saga
    */
-  registerSaga(saga: ISaga) {
+  registerSaga(saga: ISaga<DomainEvent>): void {
     this.sagas.push(saga);
   }
 
   /**
    * Setup sagas - discover and register all sagas
    */
-  private async setupSagas() {
-    const providers = [...this.moduleRef['container'].getModules().values()]
+  private async setupSagas(): Promise<void> {
+    const container = this.moduleRef['container'] as NestContainerLike;
+    const providers = [...container.getModules().values()]
       .map((module) => module.providers)
-      .reduce((acc, map) => {
-        map.forEach((value: any, key) => acc.set(key, value));
+      .reduce<Map<unknown, ProviderWrapperLike>>((acc, map) => {
+        map.forEach((value, key) => acc.set(key, value));
         return acc;
-      }, new Map());
+      }, new Map<unknown, ProviderWrapperLike>());
 
-    providers.forEach((wrapper: any) => {
+    providers.forEach((wrapper) => {
       const { instance } = wrapper;
       if (!instance) {
         return;
@@ -145,7 +166,7 @@ export class DomainEventBus implements IDomainEventBus, OnModuleInit {
 
       const sagas = this.getSagas(instance);
       sagas.forEach((saga) => {
-        this.registerSaga(saga.bind(instance));
+        this.registerSaga(saga.bind(instance) as ISaga<DomainEvent>);
         this.logger.log(`Registered saga: ${instance.constructor.name}.${saga.name}`);
       });
     });
@@ -153,9 +174,9 @@ export class DomainEventBus implements IDomainEventBus, OnModuleInit {
     // Connect sagas to command bus
     if (this.commandBus && this.sagas.length > 0) {
       this.sagas.forEach((saga) => {
-        const command$ = saga(this.subject$ as any);
+        const command$ = saga(this.subject$);
         command$.subscribe((command) => {
-          this.commandBus.execute(command).catch((err: Error) => {
+          void this.commandBus?.execute(command).catch((err: Error) => {
             this.logger.error(`Saga command execution failed: ${err.message}`, err.stack);
           });
         });
@@ -166,9 +187,9 @@ export class DomainEventBus implements IDomainEventBus, OnModuleInit {
   /**
    * Get all saga methods from an instance
    */
-  private getSagas(instance: any): Function[] {
+  private getSagas(instance: object): Array<ISaga<DomainEvent>> {
     try {
-      const prototype = Object.getPrototypeOf(instance);
+      const prototype = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
       if (!prototype) return [];
 
       const propertyNames = Object.getOwnPropertyNames(prototype);
@@ -181,13 +202,13 @@ export class DomainEventBus implements IDomainEventBus, OnModuleInit {
               return null;
             }
             const metadata = Reflect.getMetadata(SAGA_METADATA, instance, name);
-            return metadata ? property : null;
+            return metadata ? (property as ISaga<DomainEvent>) : null;
           } catch {
             // Skip properties that throw when accessed (e.g., HttpAdapterHost getters)
             return null;
           }
         })
-        .filter((saga) => saga !== null) as Function[];
+        .filter((saga): saga is ISaga<DomainEvent> => saga !== null);
     } catch {
       // If we can't get prototype, return empty array
       return [];

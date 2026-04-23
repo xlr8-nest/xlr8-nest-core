@@ -4,6 +4,12 @@ import type { DatabaseModuleConfig } from '../types';
 import { DATABASE_MODULE_CONFIG } from '../constants';
 import { createMigrationFile, prettifyQuery, queryParams } from '../utils';
 
+export interface ExecutedMigration {
+  id?: number;
+  timestamp: string | number;
+  name: string;
+}
+
 @Injectable()
 export class MigrationService {
   private readonly logger = new Logger(MigrationService.name);
@@ -79,12 +85,12 @@ export class MigrationService {
   /**
    * Get all executed migrations
    */
-  async getExecutedMigrations(): Promise<any[]> {
+  async getExecutedMigrations(): Promise<ExecutedMigration[]> {
     const tableName = this.config.migration?.tableName || 'migrations';
     try {
       const migrations = await this.dataSource.query(
         `SELECT * FROM "${tableName}" ORDER BY timestamp ASC`,
-      );
+      ) as ExecutedMigration[];
       return migrations || [];
     } catch (error) {
       this.logger.warn('Could not fetch executed migrations', error);
@@ -103,8 +109,8 @@ export class MigrationService {
 
     this.logger.log('\nExecuted Migrations:');
     if (executed.length > 0) {
-      executed.forEach((m: any) => {
-        this.logger.log(`  ✓ ${m.name}`);
+      executed.forEach((migration) => {
+        this.logger.log(`  ✓ ${migration.name}`);
       });
     } else {
       this.logger.log('  (none)');

@@ -1,7 +1,8 @@
-import { BaseError } from "./base-error";
+import { CommonErrors, StatusCode } from '../core/constants';
+import { BaseError } from './base-error';
 
-export class ForbiddenError extends BaseError{
-  constructor(code = 'FORBIDDEN', message = 'Forbidden') {
-    super(code, message);
+export class ForbiddenError<TCode extends string = string> extends BaseError<undefined, TCode> {
+  constructor(code: TCode = CommonErrors.ForbiddenError.code as TCode, message = CommonErrors.ForbiddenError.message) {
+    super(StatusCode.FORBIDDEN, code, message);
   }
 }

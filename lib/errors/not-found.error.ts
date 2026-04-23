@@ -1,9 +1,13 @@
-import { BaseError } from "./base-error";
+import { CommonErrors, StatusCode } from '../core/constants';
+import { ErrorDetails } from '../types/common/error.type';
+import { BaseError } from './base-error';
 
-export class NotFoundError extends BaseError{
-  public errors?: any;
-  constructor(code = 'NOT_FOUND', message = 'Not Found', errors?: any) {
-    super(code, message);
-    this.errors = errors;
+export class NotFoundError<TErrors extends ErrorDetails = ErrorDetails, TCode extends string = string> extends BaseError<TErrors, TCode> {
+  constructor(
+    code: TCode = CommonErrors.NotFoundError.code as TCode,
+    message = CommonErrors.NotFoundError.message,
+    errors?: TErrors,
+  ) {
+    super(StatusCode.NOT_FOUND, code, message, errors);
   }
 }

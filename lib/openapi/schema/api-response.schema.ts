@@ -38,8 +38,16 @@ export class DetailErrorSchema {
  */
 export class ErrorResponseSchema extends ApiResponseSchema {
   @ApiPropertyOptional({
-    description: 'Array of detailed error information',
-    type: [DetailErrorSchema],
+    description: 'Detailed error information grouped by field key',
+    type: 'object',
+    additionalProperties: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', example: 'ERROR_CODE' },
+        message: { type: 'string', example: 'Error message describing the issue' },
+      },
+      required: ['code', 'message'],
+    },
   })
-  errors?: DetailErrorSchema[];
+  errors?: Record<string, DetailErrorSchema>;
 }

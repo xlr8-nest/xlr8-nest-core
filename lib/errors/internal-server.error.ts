@@ -1,7 +1,11 @@
-import { BaseError } from "./base-error";
+import { CommonErrors, StatusCode } from '../core/constants';
+import { BaseError } from './base-error';
 
-export class InternalServerError extends BaseError{
-  constructor(code = 'INTERNAL_SERVER_ERROR', message = 'Internal Server Error') {
-    super(code, message);
+export class InternalServerError<TCode extends string = string> extends BaseError<undefined, TCode> {
+  constructor(
+    code: TCode = CommonErrors.InternalServerError.code as TCode,
+    message = CommonErrors.InternalServerError.message,
+  ) {
+    super(StatusCode.INTERNAL_SERVER_ERROR, code, message);
   }
 }

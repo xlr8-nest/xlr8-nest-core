@@ -12,7 +12,7 @@ export function prettifyQuery(query: string) {
   return '\n' + formattedQuery.replace(/^/gm, '      ') + '\n    ';
 }
 
-export function queryParams(parameters: any[] | undefined): string {
+export function queryParams(parameters: readonly unknown[] | undefined): string {
   if (!parameters || !parameters.length) {
     return '';
   }

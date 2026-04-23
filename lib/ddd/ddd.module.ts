@@ -1,5 +1,7 @@
 import { DynamicModule, Global, Module, OnModuleInit } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import type { Provider } from '@nestjs/common/interfaces/modules/provider.interface';
+import type { ModuleMetadata } from '@nestjs/common/interfaces/modules/module-metadata.interface';
 import { DomainEventBus } from './domain-event-bus';
 import { CommandBus } from './command-bus';
 import { QueryBus } from './query-bus';
@@ -124,7 +126,7 @@ export class CqrsModule implements OnModuleInit {
     private readonly commandBus: CommandBus,
   ) {}
 
-  onModuleInit() {
+  onModuleInit(): void {
     // Connect EventBus with CommandBus for Saga support
     this.domainEventBus.setCommandBus(this.commandBus);
   }
@@ -140,25 +142,25 @@ export class CqrsModule implements OnModuleInit {
       ...options,
     };
 
-    const providers: any[] = [];
-    const exports: any[] = [];
+    const providers: Provider[] = [];
+    const exportedProviders: NonNullable<ModuleMetadata['exports']> = [];
 
     // Always include EventBus (DomainEventBus)
     if (cqrsOptions.events) {
       providers.push(DomainEventBus);
-      exports.push(DomainEventBus);
+      exportedProviders.push(DomainEventBus);
     }
 
     // Include CommandBus
     if (cqrsOptions.commands) {
       providers.push(CommandBus);
-      exports.push(CommandBus);
+      exportedProviders.push(CommandBus);
     }
 
     // Include QueryBus
     if (cqrsOptions.queries) {
       providers.push(QueryBus);
-      exports.push(QueryBus);
+      exportedProviders.push(QueryBus);
     }
 
     return {
@@ -172,7 +174,7 @@ export class CqrsModule implements OnModuleInit {
         })
       ],
       providers,
-      exports,
+      exports: exportedProviders,
     };
   }
 }

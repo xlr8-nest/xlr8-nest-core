@@ -82,7 +82,7 @@ export abstract class AggregateRoot<T extends Identifier> extends Entity<T> {
    * }
    * ```
    */
-  protected applyEvent(event: DomainEvent): void {
+  protected applyEvent(_event: DomainEvent): void {
     // Override in subclass to handle state changes
   }
 }

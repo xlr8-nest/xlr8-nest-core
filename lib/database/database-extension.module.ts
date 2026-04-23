@@ -1,5 +1,7 @@
 import { DynamicModule, Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
+import type { FactoryProvider, Provider } from '@nestjs/common/interfaces/modules/provider.interface';
+import type { ModuleMetadata } from '@nestjs/common/interfaces/modules/module-metadata.interface';
 import { IUnitOfWorkToken, type DatabaseModuleConfig } from './types';
 import { MigrationService, SeederService } from './services';
 import { MigrationCommandRunner, SeederCommandRunner } from './commands';
@@ -7,15 +9,20 @@ import { DATABASE_MODULE_CONFIG } from './constants';
 import { TypeOrmClient } from './providers';
 
 export interface DatabaseExtensionAsyncOptions {
-  imports?: any[];
-  inject?: any[];
+  imports?: ModuleMetadata['imports'];
+  inject?: FactoryProvider<DatabaseModuleConfig>['inject'];
   useFactory: (
-    ...args: any[]
+    ...args: unknown[]
   ) => Promise<DatabaseModuleConfig> | DatabaseModuleConfig;
   global?: boolean;
 }
 
-const typeOrmClientProviders = [
+type MutableTypeOrmModuleOptions = TypeOrmModuleOptions & {
+  migrations?: string[];
+  migrationsTableName?: string;
+};
+
+const typeOrmClientProviders: Provider[] = [
   {
     provide: IUnitOfWorkToken,
     useExisting: TypeOrmClient,
@@ -57,7 +64,7 @@ export class DatabaseExtensionModule implements OnModuleInit {
   static register(config: DatabaseModuleConfig, global = true): DynamicModule {
     const typeOrmOptions = this.buildTypeOrmOptions(config);
 
-    const providers: any[] = [
+    const providers: Provider[] = [
       {
         provide: DATABASE_MODULE_CONFIG,
         useValue: config,
@@ -65,18 +72,18 @@ export class DatabaseExtensionModule implements OnModuleInit {
       ...typeOrmClientProviders,
     ];
 
-    const exports: any[] = [...typeOrmClientProviders];
+    const exportedProviders: NonNullable<ModuleMetadata['exports']> = [...typeOrmClientProviders];
 
     // Add migration service and command if enabled
     if (config.migration?.enabled) {
       providers.push(MigrationService, MigrationCommandRunner);
-      exports.push(MigrationService, MigrationCommandRunner);
+      exportedProviders.push(MigrationService, MigrationCommandRunner);
     }
 
     // Add seeder service and command if enabled
     if (config.seeder?.enabled) {
       providers.push(SeederService, SeederCommandRunner);
-      exports.push(SeederService, SeederCommandRunner);
+      exportedProviders.push(SeederService, SeederCommandRunner);
     }
 
     return {
@@ -84,7 +91,7 @@ export class DatabaseExtensionModule implements OnModuleInit {
       global,
       imports: [TypeOrmModule.forRoot(typeOrmOptions)],
       providers,
-      exports,
+      exports: exportedProviders,
     };
   }
 
@@ -92,7 +99,7 @@ export class DatabaseExtensionModule implements OnModuleInit {
    * Register database extension module asynchronously
    */
   static registerAsync(options: DatabaseExtensionAsyncOptions): DynamicModule {
-    const providers: any[] = [
+    const providers: Provider[] = [
       {
         provide: DATABASE_MODULE_CONFIG,
         useFactory: options.useFactory,
@@ -107,7 +114,7 @@ export class DatabaseExtensionModule implements OnModuleInit {
       imports: [
         ...(options.imports || []),
         TypeOrmModule.forRootAsync({
-          useFactory: async (...args: any[]) => {
+          useFactory: async (...args: unknown[]) => {
             const config = await options.useFactory(...args);
             return this.buildTypeOrmOptions(config);
           },
@@ -139,8 +146,8 @@ export class DatabaseExtensionModule implements OnModuleInit {
   ): TypeOrmModuleOptions {
     const { connection, entities, migration } = config;
 
-    const options: any = {
-      type: connection.type as any,
+    const options = {
+      type: connection.type as TypeOrmModuleOptions['type'],
       host: connection.host,
       port: connection.port,
       username: connection.username,
@@ -152,7 +159,7 @@ export class DatabaseExtensionModule implements OnModuleInit {
       entities,
       synchronize: connection.synchronize ?? false,
       logging: connection.logging ?? false,
-    };
+    } as MutableTypeOrmModuleOptions;
 
     // Add migration configuration
     if (migration?.enabled && migration.migrationsPath) {

@@ -1,37 +1,44 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { DatabaseModuleConfig, DatabaseConnectionConfig } from '../types';
+import { DatabaseModuleConfig, DatabaseConnectionConfig, EntityDefinition, MigrationDefinition, SeederConstructor } from '../types';
 
 /**
  * Unified database configuration that works with both NestJS module and CLI
  */
 export interface UnifiedDatabaseConfig {
   connection: DatabaseConnectionConfig;
-  entities: string[] | Function[];
-  migrations?: string[] | Function[];
-  seeds?: any[];
+  entities: EntityDefinition[];
+  migrations?: MigrationDefinition[];
+  seeds?: SeederConstructor[];
   migrationsTableName?: string;
 }
+
+type MutableDataSourceOptions = DataSourceOptions & {
+  migrationsTableName?: string;
+};
 
 /**
  * Convert unified config to TypeORM DataSource (for CLI)
  */
 export function createDataSource(config: UnifiedDatabaseConfig): DataSource {
   const logging = config.connection.logging;
-  const loggingOption = typeof logging === 'boolean' ? logging : (Array.isArray(logging) ? logging as any : false);
+  const loggingOption: DataSourceOptions['logging'] =
+    typeof logging === 'boolean' || Array.isArray(logging) || logging === 'all'
+      ? logging
+      : false;
   
-  const options: DataSourceOptions = {
-    type: config.connection.type as any,
+  const options = {
+    type: config.connection.type as DataSourceOptions['type'],
     host: config.connection.host,
     port: config.connection.port,
     username: config.connection.username,
     password: config.connection.password,
     database: config.connection.database,
-    entities: config.entities as any,
-    migrations: config.migrations as any,
+    entities: config.entities as DataSourceOptions['entities'],
+    migrations: config.migrations as DataSourceOptions['migrations'],
     synchronize: config.connection.synchronize ?? false,
     logging: loggingOption,
     migrationsTableName: config.migrationsTableName || 'migrations',
-  };
+  } as MutableDataSourceOptions;
 
   return new DataSource(options);
 }
@@ -60,7 +67,7 @@ export function toDatabaseModuleConfig(
 
   return {
     connection: config.connection,
-    entities: config.entities as string[],
+    entities: config.entities,
     migration: config.migrations
       ? {
           enabled: options?.migrationEnabled ?? true,
