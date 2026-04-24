@@ -1,4 +1,5 @@
 import { CommonErrors, StatusCode } from '../core/constants';
+import type { ErrorType } from '../types/common/error.type';
 
 export const SUCCESS_CODE_MAP = {
   [StatusCode.SUCCESS]: 'SUCCESS',
@@ -41,6 +42,6 @@ export const getSuccessMessage = (statusCode: number): string => {
   return SUCCESS_MESSAGE_MAP[statusCode as SuccessStatusCode] ?? SUCCESS_MESSAGE_MAP[StatusCode.SUCCESS];
 };
 
-export const getErrorDefault = (statusCode: number) => {
+export const getErrorDefault = (statusCode: number): ErrorType<DefaultErrorCode> => {
   return ERROR_DEFAULTS[statusCode as KnownErrorStatusCode] ?? ERROR_DEFAULTS[StatusCode.INTERNAL_SERVER_ERROR];
 };

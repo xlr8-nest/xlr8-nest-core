@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-04-23
+## [1.1.0] - 2026-04-24
 
 First stable release of `@xlr8-nest/core`, focused on standardizing API contracts, improving TypeScript safety, and simplifying the OpenAPI integration surface.
 
@@ -21,6 +21,7 @@ First stable release of `@xlr8-nest/core`, focused on standardizing API contract
 - Breaking: replaced semantic OpenAPI decorators with HTTP method-based decorators and promoted `ApiMethod` as the generic entrypoint
 - Updated `ApiWrappedResponse` to accept richer options for array, paginated, and custom wrapper scenarios
 - Standardized OpenAPI error schemas so `errors` is documented as a field-keyed object map
+- Updated error-facing decorators, response builders, and custom errors to accept `ErrorType` objects instead of separate `code` and `message` inputs
 - Improved type safety across response builders, custom errors, DDD buses, and database helpers
 - Expanded README examples to show recommended response return types for controllers and exception filters
 
@@ -39,6 +40,7 @@ First stable release of `@xlr8-nest/core`, focused on standardizing API contract
 - `ApiGetPaginated` -> `ApiGet(..., { paginated: true })`
 - `ApiUpdate` -> `ApiPatch` or `ApiPut`
 - `ApiAction` -> `ApiMethod`
+- Error decorators, response builders, and custom errors now prefer `error: { code, message }` instead of separate `code` and `message` parameters
 
 ## [0.1.6] - 2026-04-22
 
@@ -108,11 +110,11 @@ First stable release of `@xlr8-nest/core`, focused on standardizing API contract
 - Standardized error classes
 - Full TypeScript support with comprehensive type definitions
 
-[1.0.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.6...v1.0.0
+[1.1.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.6...v1.1.0
 [0.1.6]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.1.0...v0.1.3
 [0.1.0]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/xlr8-nest/xlr8-nest-core/releases/tag/v0.0.1
-[Unreleased]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/xlr8-nest/xlr8-nest-core/compare/v1.1.0...HEAD

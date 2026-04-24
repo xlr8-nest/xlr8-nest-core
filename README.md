@@ -302,7 +302,10 @@ export class UserService {
   async findById(id: string) {
     const user = await this.repository.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundError(`User with id ${id} not found`);
+      throw new NotFoundError({
+        code: 'USER_NOT_FOUND',
+        message: `User with id ${id} not found`,
+      });
     }
     return user;
   }
@@ -360,13 +363,17 @@ export class UserController {
     description: 'Creates a new user with the provided data'
   })
   @ApiBadRequest({
-    code: 'VALIDATION_ERROR',
-    message: 'Invalid input data',
+    error: {
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid input data',
+    },
     includeErrors: true
   })
   @ApiConflict({
-    code: 'USER_EMAIL_EXISTS',
-    message: 'Email already registered'
+    error: {
+      code: 'USER_EMAIL_EXISTS',
+      message: 'Email already registered',
+    }
   })
   async create(@Body() dto: CreateUserDto) {
     return this.userService.create(dto);
@@ -390,14 +397,42 @@ export class UserController {
 ### 5. Response Builders
 
 ```typescript
-import { buildSuccessResponse } from '@xlr8-nest/core/response';
+import {
+  buildSuccessResponse,
+  buildErrorResponse,
+  buildExceptionErrorResponse,
+  type ApiFailure,
+  type ApiSuccess,
+  type ErrorType,
+} from '@xlr8-nest/core/response';
+
+const USER_NOT_FOUND_ERROR: ErrorType<'USER_NOT_FOUND'> = {
+  code: 'USER_NOT_FOUND',
+  message: 'User not found',
+};
 
 @Get(':id')
-async findOne(@Param('id') id: string) {
+async findOne(@Param('id') id: string): Promise<ApiSuccess<UserDto>> {
   const user = await this.userService.findById(id);
   return buildSuccessResponse(user, {
     message: 'User retrieved successfully',
   });
+}
+
+function buildNotFoundBody(): ApiFailure {
+  return buildErrorResponse({
+    statusCode: 404,
+    error: USER_NOT_FOUND_ERROR,
+  });
+}
+
+function normalizeException(exception: unknown): ApiFailure {
+  return buildExceptionErrorResponse(exception, {
+    fallbackError: {
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unexpected error',
+    },
+  }).body;
 }
 ```
 
@@ -465,7 +500,7 @@ import {
 
 **Features:**
 - Type-safe success response builder for controller/service returns
-- Type-safe error response builder for manual error payloads
+- Type-safe error response builder that accepts `ErrorType`
 - Exception filter helper that normalizes `BaseError`, Nest `HttpException`, and unknown errors
 - Short aliases for controller signatures: `ApiSuccess<T>`, `ApiFailure<T>`, `ApiResult<T>`
 
@@ -473,6 +508,7 @@ import {
 - Prefer `ApiSuccess<T>` when the controller method only returns the success body.
 - Prefer `ApiResult<T>` when you want one shared API contract type across app layers or tests.
 - Avoid using bare `Response<T>` in controllers if your app also imports Nest/Express `Response`, because the name can be confusing.
+- For error builders and decorators, prefer passing a single `ErrorType` object instead of separate `code` and `message`.
 
 **Example:**
 
@@ -495,6 +531,36 @@ export class UserController {
     return buildSuccessResponse(users);
   }
 }
+```
+
+**Function reference:**
+
+```typescript
+import {
+  buildSuccessResponse,
+  buildErrorResponse,
+  buildExceptionErrorResponse,
+  type ErrorType,
+} from '@xlr8-nest/core/response';
+
+const USER_NOT_FOUND: ErrorType<'USER_NOT_FOUND'> = {
+  code: 'USER_NOT_FOUND',
+  message: 'User not found',
+};
+
+const success = buildSuccessResponse({ id: 'u_1' });
+
+const error = buildErrorResponse({
+  statusCode: 404,
+  error: USER_NOT_FOUND,
+});
+
+const normalized = buildExceptionErrorResponse(exception, {
+  fallbackError: {
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Unexpected error',
+  },
+});
 ```
 
 **Shared contract example:**
@@ -523,7 +589,12 @@ import { buildExceptionErrorResponse, type ApiFailure } from '@xlr8-nest/core/re
 export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse();
-    const { statusCode, body } = buildExceptionErrorResponse(exception);
+    const { statusCode, body } = buildExceptionErrorResponse(exception, {
+      fallbackError: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Unexpected error',
+      },
+    });
     const payload: ApiFailure = body;
 
     response.status(statusCode).json(payload);

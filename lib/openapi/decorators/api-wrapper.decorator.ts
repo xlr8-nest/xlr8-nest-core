@@ -1,6 +1,7 @@
 import { applyDecorators, Type } from '@nestjs/common';
 import { ApiExtraModels, ApiResponse, getSchemaPath } from '@nestjs/swagger';
 import { StatusCode } from '../../core/constants';
+import type { ErrorType } from '../../types/common/error.type';
 import { DetailErrorSchema } from '../schema';
 import { PaginationMetaSchema } from '../schema/pagination-response.schema';
 
@@ -40,6 +41,7 @@ export interface ApiErrorResponseOptions {
 export interface ApiErrorWrapperContext {
   statusCode: number;
   description: string;
+  error: ErrorType<string>;
   code: string;
   includeErrors: boolean;
   defaultSchema: ApiSchemaObject;
@@ -167,14 +169,13 @@ const buildDefaultWrappedResponse = <T extends Type<unknown> | null>(
 
 const buildDefaultErrorResponse = (
   statusCode: number,
-  description: string,
-  code: string,
+  error: ErrorType<string>,
   includeErrors: boolean,
 ): ApiSchemaDefinition => {
   const properties: Record<string, ApiSchemaObject> = {
     success: { type: 'boolean', example: false },
-    code: { type: 'string', example: code },
-    message: { type: 'string', example: description },
+    code: { type: 'string', example: error.code },
+    message: { type: 'string', example: error.message },
   };
 
   const extraModels = includeErrors ? [DetailErrorSchema] : [];
@@ -254,17 +255,18 @@ export const ApiPaginatedResponse = <T extends Type<unknown>>(
  */
 export const ApiErrorResponse = (
   statusCode: number,
-  description: string,
-  code: string,
+  error: ErrorType<string>,
   options: ApiErrorResponseOptions = {},
 ) => {
   const includeErrors = options.includeErrors ?? false;
-  const defaultDefinition = buildDefaultErrorResponse(statusCode, description, code, includeErrors);
+  const description = error.message;
+  const defaultDefinition = buildDefaultErrorResponse(statusCode, error, includeErrors);
   const definition = options.wrapper
     ? options.wrapper({
         statusCode,
         description,
-        code,
+        error,
+        code: error.code,
         includeErrors,
         defaultSchema: defaultDefinition.schema,
         defaultExtraModels: defaultDefinition.extraModels ?? [],

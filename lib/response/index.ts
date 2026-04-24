@@ -1,6 +1,9 @@
 export * from './response.builder';
 export * from './response.types';
 export type {
+  ErrorType,
+  DetailError,
+  ErrorDetails,
   ResponseMetadata,
   SuccessResponse,
   ErrorResponse,

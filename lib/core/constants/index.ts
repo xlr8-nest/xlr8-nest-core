@@ -1,3 +1,5 @@
+import type { ErrorType } from '../../types/common/error.type';
+
 /**
  * HTTP Status codes used across the library
  */
@@ -43,6 +45,6 @@ export const CommonErrors = {
     code: 'INTERNAL_SERVER_ERROR',
     message: 'Internal server error',
   },
-} as const;
+} as const satisfies Record<string, ErrorType>;
 
 export type CommonErrorType = keyof typeof CommonErrors;

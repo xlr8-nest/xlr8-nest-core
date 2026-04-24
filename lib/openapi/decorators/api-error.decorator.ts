@@ -1,19 +1,18 @@
 import { CommonErrors } from '../../core/constants';
+import type { ErrorType } from '../../types/common/error.type';
 import { ApiErrorResponse, ApiErrorWrapperFactory } from './api-wrapper.decorator';
 
 export interface ApiErrorOptions {
-  /** Custom error code to display in the response */
-  code: string;
-  /** Human-readable error message */
-  message?: string;
+  /** Stable error definition to display in the response */
+  error: ErrorType<string>;
   /** Whether to include field-level errors in the response schema (default: false) */
   includeErrors?: boolean;
   /** Optional wrapper factory to customize the error response envelope */
   wrapper?: ApiErrorWrapperFactory;
 }
 
-export type ApiErrorShortcutOptions = Omit<ApiErrorOptions, 'code'> & {
-  code?: string;
+export type ApiErrorShortcutOptions = Omit<ApiErrorOptions, 'error'> & {
+  error?: ErrorType<string>;
 };
 
 /**
@@ -24,15 +23,18 @@ export type ApiErrorShortcutOptions = Omit<ApiErrorOptions, 'code'> & {
  * ```typescript
  * @Post()
  * @ApiPost(UserOutput, { summary: 'Create user' })
- * @ApiError(400, { code: 'VALIDATION_ERROR', message: 'Invalid input data', includeErrors: true })
- * @ApiError(409, { code: 'USER_EMAIL_EXISTS', message: 'Email already registered' })
+ * @ApiError(400, {
+ *   error: { code: 'VALIDATION_ERROR', message: 'Invalid input data' },
+ *   includeErrors: true,
+ * })
+ * @ApiError(409, {
+ *   error: { code: 'USER_EMAIL_EXISTS', message: 'Email already registered' },
+ * })
  * async createUser() {}
  * ```
  */
 export const ApiError = (statusCode: number, options: ApiErrorOptions) => {
-  const description = options.message || `Error response with code ${options.code}`;
-
-  return ApiErrorResponse(statusCode, description, options.code, {
+  return ApiErrorResponse(statusCode, options.error, {
     includeErrors: options.includeErrors,
     wrapper: options.wrapper,
   });
@@ -42,56 +44,50 @@ export const ApiError = (statusCode: number, options: ApiErrorOptions) => {
  * Shorthand decorator for 400 Bad Request errors
  */
 export const ApiBadRequest = ({
-  code = CommonErrors.BadRequestError.code,
-  message = CommonErrors.BadRequestError.message,
+  error = CommonErrors.BadRequestError,
   includeErrors,
   wrapper,
-}: ApiErrorShortcutOptions = {}) => ApiError(400, { code, message, includeErrors, wrapper });
+}: ApiErrorShortcutOptions = {}) => ApiError(400, { error, includeErrors, wrapper });
 
 /**
  * Shorthand decorator for 401 Unauthorized errors (no errors array)
  */
 export const ApiUnauthorized = ({
-  code = CommonErrors.UnauthorizedError.code,
-  message = CommonErrors.UnauthorizedError.message,
+  error = CommonErrors.UnauthorizedError,
   wrapper,
-}: ApiErrorShortcutOptions = {}) => ApiError(401, { code, message, wrapper });
+}: ApiErrorShortcutOptions = {}) => ApiError(401, { error, wrapper });
 
 /**
  * Shorthand decorator for 403 Forbidden errors (no errors array)
  */
 export const ApiForbidden = ({
-  code = CommonErrors.ForbiddenError.code,
-  message = CommonErrors.ForbiddenError.message,
+  error = CommonErrors.ForbiddenError,
   wrapper,
-}: ApiErrorShortcutOptions = {}) => ApiError(403, { code, message, wrapper });
+}: ApiErrorShortcutOptions = {}) => ApiError(403, { error, wrapper });
 
 /**
  * Shorthand decorator for 404 Not Found errors
  */
 export const ApiNotFound = ({
-  code = CommonErrors.NotFoundError.code,
-  message = CommonErrors.NotFoundError.message,
+  error = CommonErrors.NotFoundError,
   includeErrors,
   wrapper,
-}: ApiErrorShortcutOptions = {}) => ApiError(404, { code, message, includeErrors, wrapper });
+}: ApiErrorShortcutOptions = {}) => ApiError(404, { error, includeErrors, wrapper });
 
 /**
  * Shorthand decorator for 409 Conflict errors
  */
 export const ApiConflict = ({
-  code = CommonErrors.ConflictError.code,
-  message = CommonErrors.ConflictError.message,
+  error = CommonErrors.ConflictError,
   includeErrors,
   wrapper,
-}: ApiErrorShortcutOptions = {}) => ApiError(409, { code, message, includeErrors, wrapper });
+}: ApiErrorShortcutOptions = {}) => ApiError(409, { error, includeErrors, wrapper });
 
 /**
  * Shorthand decorator for 500 Internal Server Error (no errors array)
  */
 export const ApiInternalError = ({
-  code = CommonErrors.InternalServerError.code,
-  message = CommonErrors.InternalServerError.message,
+  error = CommonErrors.InternalServerError,
   includeErrors,
   wrapper,
-}: ApiErrorShortcutOptions = {}) => ApiError(500, { code, message, includeErrors, wrapper });
+}: ApiErrorShortcutOptions = {}) => ApiError(500, { error, includeErrors, wrapper });
