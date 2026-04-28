@@ -42,6 +42,16 @@
         "default": "./dist/database/index.js"
       }
     },
+    "./constants": {
+      "import": {
+        "types": "./dist/constants/index.d.mts",
+        "default": "./dist/constants/index.mjs"
+      },
+      "require": {
+        "types": "./dist/constants/index.d.ts",
+        "default": "./dist/constants/index.js"
+      }
+    },
     "./errors": {
       "import": {
         "types": "./dist/errors/index.d.mts",
@@ -82,6 +92,26 @@
         "default": "./dist/types/index.js"
       }
     },
+    "./util": {
+      "import": {
+        "types": "./dist/utils/index.d.mts",
+        "default": "./dist/utils/index.mjs"
+      },
+      "require": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.js"
+      }
+    },
+    "./utils": {
+      "import": {
+        "types": "./dist/utils/index.d.mts",
+        "default": "./dist/utils/index.mjs"
+      },
+      "require": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.js"
+      }
+    },
     "./validator": {
       "import": {
         "types": "./dist/validator/index.d.mts",
@@ -120,6 +150,12 @@
       "optional": true
     },
     "@nestjs/typeorm": {
+      "optional": true
+    },
+    "reflect-metadata": {
+      "optional": true
+    },
+    "rxjs": {
       "optional": true
     },
     "typeorm": {

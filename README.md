@@ -49,6 +49,17 @@ This library supports a wide range of NestJS and dependency versions for maximum
 
 ✅ **Tested with latest versions**: NestJS 11, Swagger 11, Zod 4, Event Emitter 3
 
+## 🧩 Standalone Imports
+
+Use standalone subpath imports when you only need constants or utilities:
+
+```typescript
+import { StatusCode, CommonErrors } from '@xlr8-nest/core/constants';
+import { validateInput } from '@xlr8-nest/core/utils';
+```
+
+`@xlr8-nest/core/constants` has no runtime peer dependencies. `@xlr8-nest/core/utils` currently contains Zod/Nest validation helpers, so install `@nestjs/common` and `zod` when using it.
+
 ## 🚀 Quick Start
 
 ### 1. DDD & CQRS Module
@@ -653,6 +664,8 @@ This package requires the following peer dependencies based on which modules you
 | **validator** | `@nestjs/common` | `zod` |
 | **errors** | `@nestjs/common` | - |
 | **types** | - | - |
+| **constants** | - | - |
+| **utils** | `@nestjs/common`, `zod` | - |
 
 All peer dependencies are marked as **optional** in `peerDependenciesMeta`, so you only need to install what you use.
 
