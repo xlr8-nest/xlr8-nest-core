@@ -6,10 +6,11 @@ import { DetailErrorSchema } from '../schema';
 import { PaginationMetaSchema } from '../schema/pagination-response.schema';
 
 type ApiSchemaObject = Record<string, unknown>;
+export type ApiResponseDataType = Type<unknown> | null | undefined;
 
 export interface ApiSchemaDefinition {
   schema: ApiSchemaObject;
-  extraModels?: Type<unknown>[];
+  extraModels?: ApiResponseDataType[];
 }
 
 export interface ApiWrappedResponseOptions {
@@ -18,7 +19,7 @@ export interface ApiWrappedResponseOptions {
   wrapper?: ApiSuccessWrapperFactory;
 }
 
-export interface ApiSuccessWrapperContext<T extends Type<unknown> | null = Type<unknown> | null> {
+export interface ApiSuccessWrapperContext<T extends ApiResponseDataType = ApiResponseDataType> {
   statusCode: number;
   description: string;
   dataType: T;
@@ -29,7 +30,7 @@ export interface ApiSuccessWrapperContext<T extends Type<unknown> | null = Type<
   defaultExtraModels: Type<unknown>[];
 }
 
-export type ApiSuccessWrapperFactory = <T extends Type<unknown> | null = Type<unknown> | null>(
+export type ApiSuccessWrapperFactory = <T extends ApiResponseDataType = ApiResponseDataType>(
   context: ApiSuccessWrapperContext<T>,
 ) => ApiSchemaDefinition;
 
@@ -82,8 +83,16 @@ const buildPaginatedDataSchema = <T extends Type<unknown>>(itemType: T): ApiSche
   required: ['items', 'meta'],
 });
 
-const dedupeExtraModels = (extraModels: Type<unknown>[] = []): Type<unknown>[] => {
-  return Array.from(new Set(extraModels));
+const isResponseModel = (model: ApiResponseDataType): model is Type<unknown> => {
+  return typeof model === 'function';
+};
+
+const isNullishDataType = (dataType: ApiResponseDataType): dataType is null | undefined => {
+  return dataType == null;
+};
+
+const dedupeExtraModels = (extraModels: ApiResponseDataType[] = []): Type<unknown>[] => {
+  return Array.from(new Set(extraModels.filter(isResponseModel)));
 };
 
 const applyResponseSchema = (statusCode: number, description: string, schemaDefinition: ApiSchemaDefinition) => {
@@ -106,23 +115,25 @@ const applyResponseSchema = (statusCode: number, description: string, schemaDefi
 };
 
 const assertWrappedResponseOptions = (
-  dataType: Type<unknown> | null,
+  dataType: ApiResponseDataType,
   { isArray = false, paginated = false }: ApiWrappedResponseOptions,
 ) => {
-  if (paginated && dataType === null) {
-    throw new Error('ApiWrappedResponse does not support paginated responses when dataType is null.');
+  if (paginated && isNullishDataType(dataType)) {
+    throw new Error('ApiWrappedResponse does not support paginated responses when dataType is null or undefined.');
   }
 
   if (paginated && isArray) {
     throw new Error('ApiWrappedResponse does not support using both paginated and isArray at the same time.');
   }
 
-  if (dataType === null && (isArray || paginated)) {
-    throw new Error('ApiWrappedResponse with a null dataType only supports non-array, non-paginated responses.');
+  if (isNullishDataType(dataType) && (isArray || paginated)) {
+    throw new Error(
+      'ApiWrappedResponse with a null or undefined dataType only supports non-array, non-paginated responses.',
+    );
   }
 };
 
-const buildDefaultWrappedResponse = <T extends Type<unknown> | null>(
+const buildDefaultWrappedResponse = <T extends ApiResponseDataType>(
   statusCode: number,
   description: string,
   dataType: T,
@@ -134,7 +145,7 @@ const buildDefaultWrappedResponse = <T extends Type<unknown> | null>(
 
   assertWrappedResponseOptions(dataType, { isArray, paginated });
 
-  if (dataType === null) {
+  if (isNullishDataType(dataType)) {
     return {
       schema: {
         type: 'object',
@@ -202,15 +213,16 @@ const buildDefaultErrorResponse = (
 /**
  * Creates a wrapped success response schema for Swagger
  * Wraps the data type in the standard SuccessResponse format
- * Pass null for dataType to indicate data: null in the response
+ * Pass null or undefined for dataType to indicate data: null in the response
  */
-export const ApiWrappedResponse = <T extends Type<unknown> | null>(
+export const ApiWrappedResponse = <T extends ApiResponseDataType>(
   statusCode: number,
   description: string,
   dataType: T,
   options: ApiWrappedResponseOptions = {},
 ) => {
   const defaultDefinition = buildDefaultWrappedResponse(statusCode, description, dataType, options);
+  const defaultExtraModels = dedupeExtraModels(defaultDefinition.extraModels);
   const isArray = options.isArray ?? false;
   const paginated = options.paginated ?? false;
   const code = STATUS_CODE_MAP[statusCode] || 'SUCCESS';
@@ -224,7 +236,7 @@ export const ApiWrappedResponse = <T extends Type<unknown> | null>(
         isArray,
         paginated,
         defaultSchema: defaultDefinition.schema,
-        defaultExtraModels: defaultDefinition.extraModels ?? [],
+        defaultExtraModels,
       })
     : defaultDefinition;
 
@@ -261,6 +273,7 @@ export const ApiErrorResponse = (
   const includeErrors = options.includeErrors ?? false;
   const description = error.message;
   const defaultDefinition = buildDefaultErrorResponse(statusCode, error, includeErrors);
+  const defaultExtraModels = dedupeExtraModels(defaultDefinition.extraModels);
   const definition = options.wrapper
     ? options.wrapper({
         statusCode,
@@ -269,7 +282,7 @@ export const ApiErrorResponse = (
         code: error.code,
         includeErrors,
         defaultSchema: defaultDefinition.schema,
-        defaultExtraModels: defaultDefinition.extraModels ?? [],
+        defaultExtraModels,
       })
     : defaultDefinition;
 

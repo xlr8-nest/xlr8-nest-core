@@ -1,6 +1,6 @@
 import { applyDecorators, Type } from '@nestjs/common';
 import { ApiExtraModels, ApiOperation, ApiResponse, getSchemaPath } from '@nestjs/swagger';
-import { ApiSuccessWrapperFactory, ApiWrappedResponse } from './api-wrapper.decorator';
+import { ApiResponseDataType, ApiSuccessWrapperFactory, ApiWrappedResponse } from './api-wrapper.decorator';
 import { StatusCode } from '../../core/constants';
 
 export type ApiHttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'HEAD' | 'OPTIONS';
@@ -53,7 +53,11 @@ const getDefaultMessageForMethod = (method: string, options: ApiMethodOptions): 
 /**
  * Combined decorator for documenting successful HTTP method responses.
  */
-export const ApiMethod = <T extends Type<unknown> | null>(method: ApiHttpMethod | string, dataType: T, options: ApiMethodOptions) => {
+export const ApiMethod = <T extends ApiResponseDataType>(
+  method: ApiHttpMethod | string,
+  dataType: T,
+  options: ApiMethodOptions,
+) => {
   const status = options.status ?? getDefaultStatusForMethod(method);
   const message = getDefaultMessageForMethod(method, options);
 
@@ -67,32 +71,32 @@ export const ApiMethod = <T extends Type<unknown> | null>(method: ApiHttpMethod 
   );
 };
 
-export const ApiPost = <T extends Type<unknown> | null>(dataType: T, options: ApiMethodOptions) => {
+export const ApiPost = <T extends ApiResponseDataType>(dataType: T, options: ApiMethodOptions) => {
   return ApiMethod('POST', dataType, options);
 };
 
-export const ApiGet = <T extends Type<unknown> | null>(dataType: T, options: ApiMethodOptions) => {
+export const ApiGet = <T extends ApiResponseDataType>(dataType: T, options: ApiMethodOptions) => {
   return ApiMethod('GET', dataType, options);
 };
 
-export const ApiPatch = <T extends Type<unknown> | null>(dataType: T, options: ApiMethodOptions) => {
+export const ApiPatch = <T extends ApiResponseDataType>(dataType: T, options: ApiMethodOptions) => {
   return ApiMethod('PATCH', dataType, options);
 };
 
-export const ApiPut = <T extends Type<unknown> | null>(dataType: T, options: ApiMethodOptions) => {
+export const ApiPut = <T extends ApiResponseDataType>(dataType: T, options: ApiMethodOptions) => {
   return ApiMethod('PUT', dataType, options);
 };
 
-export const ApiDelete = <T extends Type<unknown> | null>(dataType: T, options: ApiMethodOptions) => {
+export const ApiDelete = <T extends ApiResponseDataType>(dataType: T, options: ApiMethodOptions) => {
   return ApiMethod('DELETE', dataType, options);
 };
 
 /**
  * Combined decorator for successful redirect endpoints (302)
  * Combines HttpRedirect + ApiOperation + ApiRedirectResponse with wrapped format
- * Pass null for dataType to indicate data: null in the response
+ * Pass null or undefined for dataType to indicate data: null in the response
  */
-export const ApiRedirect = <T extends Type<unknown> | null>(dataType: T, options: ApiMethodOptions) => {
+export const ApiRedirect = <T extends ApiResponseDataType>(dataType: T, options: ApiMethodOptions) => {
   const status = options.status ?? StatusCode.REDIRECT;
   const message = options.message ?? 'Resource redirected successfully';
 

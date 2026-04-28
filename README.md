@@ -391,8 +391,17 @@ export class UserController {
   async findAll(@Query() query: PaginationDto) {
     return this.userService.findAll(query);
   }
+
+  @Delete(':id')
+  @ApiDelete(null, { summary: 'Delete user' })
+  async delete(@Param('id') id: string) {
+    await this.userService.delete(id);
+    return null;
+  }
 }
 ```
+
+Use `null` or `undefined` as the response data type for endpoints whose wrapped response has `data: null`.
 
 ### 5. Response Builders
 
