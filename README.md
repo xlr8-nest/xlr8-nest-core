@@ -181,14 +181,14 @@ import {
 **Features:**
 
 - `EventModule` - EventEmitter infrastructure for domain event handlers
-- `AggregateRoot` - Base class that records domain events raised by the aggregate
+- `AggregateRoot` - Base class that records domain events and exposes `pullEvents()` for publishing
 - `Entity` - Base entity class with identity management
 - `ValueObject` - Abstract value object base class
-- `EventBus` - Publishes events collected from aggregates to `@EventHandler()` handlers and sagas
+- `EventBus` - Publishes pulled aggregate events to `@EventHandler()` handlers and sagas
 - `CommandBus` / `QueryBus` - CQRS buses with automatic handler discovery
 - Decorators: `@Event()`, `@EventHandler()`, `@CommandHandler()`, `@QueryHandler()`, `@Saga()`
 
-Aggregate roots only collect events. Application code decides when to publish them, usually after the aggregate has been persisted.
+Aggregate roots only collect events. Use protected `addEvent()` inside aggregate methods, then publish with `EventBus` by calling public `pullEvents()` after the aggregate has been persisted. `pullEvents()` returns the recorded events and clears the aggregate event list.
 
 **Example:**
 
@@ -229,13 +229,13 @@ export class User extends AggregateRoot<string> {
 
   static create(name: string, email: string): User {
     const user = new User(uuid(), name, email);
-    user.raiseEvent(new UserCreatedEvent(user.id));
+    user.addEvent(new UserCreatedEvent(user.id));
     return user;
   }
 
   changeEmail(email: string): void {
     this.email = email;
-    this.raiseEvent(new UserEmailChangedEvent(this.id, email));
+    this.addEvent(new UserEmailChangedEvent(this.id, email));
   }
 }
 
@@ -250,8 +250,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   async execute(command: CreateUserCommand) {
     const user = User.create(command.name, command.email);
     await this.repository.save(user);
-    await this.eventBus.publishAll(user.getEvents());
-    user.clearEvents();
+    await this.eventBus.publishAll(user.pullEvents());
     return user;
   }
 }

@@ -15,11 +15,7 @@ import type {
 import { getModuleProviders } from './utils/provider-discovery.util';
 import { getSagas } from './utils/saga-discovery.util';
 
-export type {
-  DomainEventHandler,
-  IEventBus,
-  ISaga,
-} from './common/event-bus.type';
+export type { DomainEventHandler, IEventBus, ISaga } from './common/event-bus.type';
 export { SAGA_METADATA } from './common/metadata';
 
 /**
@@ -54,8 +50,7 @@ export { SAGA_METADATA } from './common/metadata';
  * class UserModule {}
  *
  * // 4. Publish events collected by an aggregate
- * await eventBus.publishAll(user.getEvents());
- * user.clearEvents();
+ * await eventBus.publishAll(user.pullEvents());
  * ```
  */
 @Injectable()

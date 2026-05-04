@@ -17,14 +17,12 @@ export abstract class AggregateRoot<T extends Identifier> extends Entity<T> {
   }
 
   /**
-   * Get recorded domain events so application code can publish them.
+   * Pull recorded domain events so application code can publish them.
+   * This clears the aggregate event list.
    */
   pullEvents(): DomainEvent[] {
     const _events = [...this.events];
     this.events.length = 0;
     return _events;
   }
-
-  
-
 }
