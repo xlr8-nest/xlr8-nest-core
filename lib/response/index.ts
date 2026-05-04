@@ -1,4 +1,5 @@
 export * from './response.builder';
+export * from './response.normalizer';
 export * from './response.types';
 export type {
   ErrorType,

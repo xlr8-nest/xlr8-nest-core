@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Removed `buildExceptionErrorResponse` from the response module API.
+
 ## [1.1.0] - 2026-04-24
 
 First stable release of `@xlr8-nest/core`, focused on standardizing API contracts, improving TypeScript safety, and simplifying the OpenAPI integration surface.
 
 ### Added
-- Added a new `response` submodule with `buildSuccessResponse`, `buildErrorResponse`, and `buildExceptionErrorResponse`
+- Added a new `response` submodule with response builders and exception normalization utilities
 - Added controller-friendly response aliases: `ApiSuccess<T>`, `ApiFailure<TErrors>`, and `ApiResult<TData, TErrors>`
 - Added HTTP method-based OpenAPI decorators: `ApiMethod`, `ApiPost`, `ApiGet`, `ApiPatch`, `ApiPut`, and `ApiDelete`
 - Added custom OpenAPI wrapper factories for both success and error responses while preserving the default wrapped response format

@@ -420,11 +420,12 @@ Use `null` or `undefined` as the response data type for endpoints whose wrapped 
 import {
   buildSuccessResponse,
   buildErrorResponse,
-  buildExceptionErrorResponse,
+  normalizeUnknownException,
   type ApiFailure,
   type ApiSuccess,
   type ErrorType,
 } from '@xlr8-nest/core/response';
+import { NotFoundError } from '@xlr8-nest/core/errors';
 
 const USER_NOT_FOUND_ERROR: ErrorType<'USER_NOT_FOUND'> = {
   code: 'USER_NOT_FOUND',
@@ -440,14 +441,11 @@ async findOne(@Param('id') id: string): Promise<ApiSuccess<UserDto>> {
 }
 
 function buildNotFoundBody(): ApiFailure {
-  return buildErrorResponse({
-    statusCode: 404,
-    error: USER_NOT_FOUND_ERROR,
-  });
+  return buildErrorResponse(new NotFoundError(USER_NOT_FOUND_ERROR));
 }
 
 function normalizeException(exception: unknown): ApiFailure {
-  return buildExceptionErrorResponse(exception, {
+  return buildErrorResponse(exception, {
     fallbackError: {
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Unexpected error',
@@ -510,7 +508,7 @@ Response builders for standardized success/error payloads.
 import {
   buildSuccessResponse,
   buildErrorResponse,
-  buildExceptionErrorResponse,
+  normalizeUnknownException,
   type ApiResult,
   type ApiSuccess,
   type ApiFailure,
@@ -520,8 +518,8 @@ import {
 
 **Features:**
 - Type-safe success response builder for controller/service returns
-- Type-safe error response builder that accepts `ErrorType`
-- Exception filter helper that normalizes `BaseError`, Nest `HttpException`, and unknown errors
+- Type-safe error response builder that derives payloads from exceptions
+- Exception normalizer for `BaseError`, Nest `HttpException`, and unknown errors
 - Short aliases for controller signatures: `ApiSuccess<T>`, `ApiFailure<T>`, `ApiResult<T>`
 
 **Recommended naming for controller return types:**
@@ -559,9 +557,10 @@ export class UserController {
 import {
   buildSuccessResponse,
   buildErrorResponse,
-  buildExceptionErrorResponse,
+  normalizeUnknownException,
   type ErrorType,
 } from '@xlr8-nest/core/response';
+import { NotFoundError } from '@xlr8-nest/core/errors';
 
 const USER_NOT_FOUND: ErrorType<'USER_NOT_FOUND'> = {
   code: 'USER_NOT_FOUND',
@@ -570,15 +569,25 @@ const USER_NOT_FOUND: ErrorType<'USER_NOT_FOUND'> = {
 
 const success = buildSuccessResponse({ id: 'u_1' });
 
-const error = buildErrorResponse({
-  statusCode: 404,
-  error: USER_NOT_FOUND,
-});
+const error = buildErrorResponse(new NotFoundError(USER_NOT_FOUND));
 
-const normalized = buildExceptionErrorResponse(exception, {
+const normalized = normalizeUnknownException(exception, {
   fallbackError: {
     code: 'INTERNAL_SERVER_ERROR',
     message: 'Unexpected error',
+  },
+  customErrorFactory: (error) => {
+    if (error instanceof ExternalServiceError) {
+      return {
+        statusCode: 502,
+        error: {
+          code: 'EXTERNAL_SERVICE_ERROR',
+          message: error.message,
+        },
+      };
+    }
+
+    return undefined;
   },
 });
 ```
@@ -603,19 +612,20 @@ export class UserFacade {
 **Exception filter example:**
 
 ```typescript
-import { buildExceptionErrorResponse, type ApiFailure } from '@xlr8-nest/core/response';
+import { buildErrorResponse, normalizeUnknownException, type ApiFailure } from '@xlr8-nest/core/response';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse();
-    const { statusCode, body } = buildExceptionErrorResponse(exception, {
+    const options = {
       fallbackError: {
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Unexpected error',
       },
-    });
-    const payload: ApiFailure = body;
+    };
+    const { statusCode } = normalizeUnknownException(exception, options);
+    const payload: ApiFailure = buildErrorResponse(exception, options);
 
     response.status(statusCode).json(payload);
   }
