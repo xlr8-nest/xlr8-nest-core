@@ -1,7 +1,7 @@
-// DDD Core
+// Domain Core
 export * from './aggregate-root';
 export * from './domain-event';
-export * from './domain-event-bus';
+export * from './event-bus';
 export * from './domain-event.decorator';
 export * from './domain-service';
 export * from './entity';
@@ -13,5 +13,6 @@ export * from './command-bus';
 export * from './query-bus';
 export * from './cqrs.decorator';
 
-// Modules
-export * from './ddd.module';
+// Event/CQRS Modules
+export * from './event.module';
+export * from './cqrs.module';

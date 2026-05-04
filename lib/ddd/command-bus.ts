@@ -1,5 +1,7 @@
 import { Injectable, Type, Logger, OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { COMMAND_HANDLER_METADATA } from './common/metadata';
+import { getModuleProviders } from './utils/provider-discovery.util';
 
 export interface ICommand {}
 
@@ -7,20 +9,7 @@ export interface ICommandHandler<TCommand extends ICommand = ICommand, TResult =
   execute(command: TCommand): Promise<TResult>;
 }
 
-export const COMMAND_HANDLER_METADATA = '__commandHandler__';
-
-interface HandlerWrapper {
-  instance?: unknown;
-  metatype?: Type<unknown>;
-}
-
-interface ModuleProviderMap {
-  providers: Map<unknown, HandlerWrapper>;
-}
-
-interface NestContainerLike {
-  getModules(): Map<unknown, ModuleProviderMap>;
-}
+export { COMMAND_HANDLER_METADATA } from './common/metadata';
 
 @Injectable()
 export class CommandBus implements OnModuleInit {
@@ -49,7 +38,7 @@ export class CommandBus implements OnModuleInit {
     }
 
     this.logger.debug(`Executing command: ${commandName}`);
-    return await handler.execute(command) as TResult;
+    return (await handler.execute(command)) as TResult;
   }
 
   /**
@@ -66,13 +55,7 @@ export class CommandBus implements OnModuleInit {
    * Automatically discover and register all command handlers
    */
   private async register(): Promise<void> {
-    const container = this.moduleRef['container'] as NestContainerLike;
-    const providers = [...container.getModules().values()]
-      .map((module) => module.providers)
-      .reduce<Map<unknown, HandlerWrapper>>((acc, map) => {
-        map.forEach((value, key) => acc.set(key, value));
-        return acc;
-      }, new Map<unknown, HandlerWrapper>());
+    const providers = getModuleProviders(this.moduleRef);
 
     providers.forEach((wrapper) => {
       const { instance, metatype } = wrapper;
@@ -80,7 +63,9 @@ export class CommandBus implements OnModuleInit {
         return;
       }
 
-      const command = Reflect.getMetadata(COMMAND_HANDLER_METADATA, metatype) as Type<ICommand> | undefined;
+      const command = Reflect.getMetadata(COMMAND_HANDLER_METADATA, metatype) as
+        | Type<ICommand>
+        | undefined;
       if (!command) {
         return;
       }

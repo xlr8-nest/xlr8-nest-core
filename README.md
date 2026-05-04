@@ -9,7 +9,7 @@
 
 ## ✨ Features
 
-- 🏗️ **DDD & CQRS**: Complete Domain-Driven Design implementation with Command/Query buses
+- 🏗️ **Event Module & CQRS**: Domain events, aggregate roots, and Command/Query buses
 - 📦 **Unit of Work**: TypeORM extensions with UoW pattern using AsyncLocalStorage
 - 🔄 **Event-Driven**: Domain events with Saga pattern support
 - 📝 **OpenAPI**: Pre-configured Swagger decorators for standardized API documentation
@@ -35,17 +35,17 @@ pnpm add @xlr8-nest/core
 
 This library supports a wide range of NestJS and dependency versions for maximum flexibility:
 
-| Package | Supported Versions |
-|---------|-------------------|
-| `@nestjs/common` | ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0 |
-| `@nestjs/core` | ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0 |
-| `@nestjs/swagger` | ^6.0.0 \|\| ^7.0.0 \|\| ^8.0.0 \|\| ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 |
-| `@nestjs/typeorm` | ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0 |
-| `@nestjs/event-emitter` | ^2.0.0 \|\| ^3.0.0 \|\| ^4.0.0 |
-| `rxjs` | ^7.0.0 \|\| ^8.0.0 |
-| `typeorm` | ^0.3.0 \|\| ^0.4.0 |
-| `zod` | ^3.0.0 \|\| ^4.0.0 \|\| ^5.0.0 |
-| `reflect-metadata` | ^0.1.13 \|\| ^0.2.0 \|\| ^0.3.0 |
+| Package                 | Supported Versions                                                   |
+| ----------------------- | -------------------------------------------------------------------- |
+| `@nestjs/common`        | ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0                        |
+| `@nestjs/core`          | ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0                        |
+| `@nestjs/swagger`       | ^6.0.0 \|\| ^7.0.0 \|\| ^8.0.0 \|\| ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 |
+| `@nestjs/typeorm`       | ^9.0.0 \|\| ^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0                        |
+| `@nestjs/event-emitter` | ^2.0.0 \|\| ^3.0.0 \|\| ^4.0.0                                       |
+| `rxjs`                  | ^7.0.0 \|\| ^8.0.0                                                   |
+| `typeorm`               | ^0.3.0 \|\| ^0.4.0                                                   |
+| `zod`                   | ^3.0.0 \|\| ^4.0.0 \|\| ^5.0.0                                       |
+| `reflect-metadata`      | ^0.1.13 \|\| ^0.2.0 \|\| ^0.3.0                                      |
 
 ✅ **Tested with latest versions**: NestJS 11, Swagger 11, Zod 4, Event Emitter 3
 
@@ -62,18 +62,18 @@ import { validateInput } from '@xlr8-nest/core/utils';
 
 ## 🚀 Quick Start
 
-### 1. DDD & CQRS Module
+### 1. Event Module
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { DddModule } from '@xlr8-nest/core/ddd';
+import { EventModule } from '@xlr8-nest/core/ddd';
 
 @Module({
   imports: [
-    DddModule.forRoot({
-      events: { global: true },
-      commandHandlers: [CreateUserHandler],
-      queryHandlers: [GetUserHandler],
+    EventModule.forRoot({
+      wildcard: false,
+      delimiter: '.',
+      maxListeners: 10,
     }),
   ],
 })
@@ -160,9 +160,9 @@ export class UserController {
 
 This package provides multiple modules that can be imported individually:
 
-### 🏗️ DDD & CQRS (`@xlr8-nest/core/ddd`)
+### 🏗️ Event Module & CQRS (`@xlr8-nest/core/ddd`)
 
-Domain-Driven Design and CQRS implementation for NestJS.
+Domain model primitives, EventEmitter-backed domain event handlers, and optional CQRS buses for NestJS.
 
 ```typescript
 import {
@@ -172,18 +172,23 @@ import {
   DomainEvent,
   CommandBus,
   QueryBus,
-  DomainEventBus,
-  DddModule
+  EventBus,
+  EventModule,
+  CqrsModule,
 } from '@xlr8-nest/core/ddd';
 ```
 
 **Features:**
-- `AggregateRoot` - Base class with domain event support
+
+- `EventModule` - EventEmitter infrastructure for domain event handlers
+- `AggregateRoot` - Base class that records domain events raised by the aggregate
 - `Entity` - Base entity class with identity management
 - `ValueObject` - Abstract value object base class
+- `EventBus` - Publishes events collected from aggregates to `@EventHandler()` handlers and sagas
 - `CommandBus` / `QueryBus` - CQRS buses with automatic handler discovery
-- `DomainEventBus` - Event bus with Saga support
 - Decorators: `@Event()`, `@EventHandler()`, `@CommandHandler()`, `@QueryHandler()`, `@Saga()`
+
+Aggregate roots only collect events. Application code decides when to publish them, usually after the aggregate has been persisted.
 
 **Example:**
 
@@ -193,34 +198,60 @@ import {
 export class UserCreatedEvent implements DomainEvent {
   constructor(
     public readonly userId: string,
-    public readonly occurredOn = new Date()
+    public readonly occurredOn = new Date(),
   ) {}
-  get eventName() { return getEventName(this); }
+  get eventName() {
+    return getEventName(this);
+  }
+}
+
+@Event()
+export class UserEmailChangedEvent implements DomainEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly email: string,
+    public readonly occurredOn = new Date(),
+  ) {}
+  get eventName() {
+    return getEventName(this);
+  }
 }
 
 // Create aggregate root
-export class User extends AggregateRoot {
+export class User extends AggregateRoot<string> {
   constructor(
     id: string,
     private name: string,
-    private email: string
+    private email: string,
   ) {
     super(id);
   }
 
   static create(name: string, email: string): User {
     const user = new User(uuid(), name, email);
-    user.addDomainEvent(new UserCreatedEvent(user.id));
+    user.raiseEvent(new UserCreatedEvent(user.id));
     return user;
+  }
+
+  changeEmail(email: string): void {
+    this.email = email;
+    this.raiseEvent(new UserEmailChangedEvent(this.id, email));
   }
 }
 
 // Command handler
 @CommandHandler(CreateUserCommand)
 export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
+  constructor(
+    private readonly repository: UserRepository,
+    private readonly eventBus: EventBus,
+  ) {}
+
   async execute(command: CreateUserCommand) {
     const user = User.create(command.name, command.email);
     await this.repository.save(user);
+    await this.eventBus.publishAll(user.getEvents());
+    user.clearEvents();
     return user;
   }
 }
@@ -247,11 +278,12 @@ import {
   MigrationService,
   SeederService,
   BaseSeeder,
-  BaseFactory
+  BaseFactory,
 } from '@xlr8-nest/core/database';
 ```
 
 **Features:**
+
 - Unit of Work pattern with AsyncLocalStorage
 - Migration & Seeder services with CLI commands
 - Base classes for seeders and factories
@@ -301,7 +333,7 @@ import {
   UnauthorizedError,
   ForbiddenError,
   ConflictError,
-  InternalServerError
+  InternalServerError,
 } from '@xlr8-nest/core/errors';
 ```
 
@@ -338,11 +370,12 @@ import {
   ApiError,
   ApiBadRequest,
   ApiConflict,
-  ApiNotFound
+  ApiNotFound,
 } from '@xlr8-nest/core/openapi';
 ```
 
 **Features:**
+
 - HTTP method-based decorators with wrapped response format
 - Error response decorators
 - Custom success/error wrapper factories
@@ -351,14 +384,14 @@ import {
 
 **Breaking change migration:**
 
-| Removed decorator | Use instead |
-|---------|-------------------|
-| `ApiCreate` | `ApiPost` |
-| `ApiGetOne` | `ApiGet` |
-| `ApiGetMany` | `ApiGet(..., { isArray: true })` |
+| Removed decorator | Use instead                        |
+| ----------------- | ---------------------------------- |
+| `ApiCreate`       | `ApiPost`                          |
+| `ApiGetOne`       | `ApiGet`                           |
+| `ApiGetMany`      | `ApiGet(..., { isArray: true })`   |
 | `ApiGetPaginated` | `ApiGet(..., { paginated: true })` |
-| `ApiUpdate` | `ApiPatch` or `ApiPut` |
-| `ApiAction` | `ApiMethod` |
+| `ApiUpdate`       | `ApiPatch` or `ApiPut`             |
+| `ApiAction`       | `ApiMethod`                        |
 
 `ApiDelete` is still available, but it now follows the HTTP method-based API and defaults to `200`.
 
@@ -371,20 +404,20 @@ export class UserController {
   @Post()
   @ApiPost(UserDto, {
     summary: 'Create a new user',
-    description: 'Creates a new user with the provided data'
+    description: 'Creates a new user with the provided data',
   })
   @ApiBadRequest({
     error: {
       code: 'VALIDATION_ERROR',
       message: 'Invalid input data',
     },
-    includeErrors: true
+    includeErrors: true,
   })
   @ApiConflict({
     error: {
       code: 'USER_EMAIL_EXISTS',
       message: 'Email already registered',
-    }
+    },
   })
   async create(@Body() dto: CreateUserDto) {
     return this.userService.create(dto);
@@ -496,7 +529,7 @@ import {
   ApiSuccess,
   ApiFailure,
   UserIdentity,
-  PaginationMeta
+  PaginationMeta,
 } from '@xlr8-nest/core/types';
 ```
 
@@ -517,12 +550,14 @@ import {
 ```
 
 **Features:**
+
 - Type-safe success response builder for controller/service returns
 - Type-safe error response builder that derives payloads from exceptions
 - Exception normalizer for `BaseError`, Nest `HttpException`, and unknown errors
 - Short aliases for controller signatures: `ApiSuccess<T>`, `ApiFailure<T>`, `ApiResult<T>`
 
 **Recommended naming for controller return types:**
+
 - Prefer `ApiSuccess<T>` when the controller method only returns the success body.
 - Prefer `ApiResult<T>` when you want one shared API contract type across app layers or tests.
 - Avoid using bare `Response<T>` in controllers if your app also imports Nest/Express `Response`, because the name can be confusing.
@@ -612,7 +647,11 @@ export class UserFacade {
 **Exception filter example:**
 
 ```typescript
-import { buildErrorResponse, normalizeUnknownException, type ApiFailure } from '@xlr8-nest/core/response';
+import {
+  buildErrorResponse,
+  normalizeUnknownException,
+  type ApiFailure,
+} from '@xlr8-nest/core/response';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -665,17 +704,17 @@ async update(
 
 This package requires the following peer dependencies based on which modules you use:
 
-| Module | Required Dependencies | Optional |
-|--------|----------------------|----------|
-| **ddd** | `@nestjs/common`, `@nestjs/core`, `rxjs` | `@nestjs/event-emitter` |
-| **database** | `@nestjs/common`, `@nestjs/core` | `@nestjs/typeorm`, `typeorm` |
-| **openapi** | `@nestjs/common` | `@nestjs/swagger` |
-| **response** | `@nestjs/common` | - |
-| **validator** | `@nestjs/common` | `zod` |
-| **errors** | `@nestjs/common` | - |
-| **types** | - | - |
-| **constants** | - | - |
-| **utils** | `@nestjs/common`, `zod` | - |
+| Module        | Required Dependencies                    | Optional                     |
+| ------------- | ---------------------------------------- | ---------------------------- |
+| **ddd**       | `@nestjs/common`, `@nestjs/core`, `rxjs` | `@nestjs/event-emitter`      |
+| **database**  | `@nestjs/common`, `@nestjs/core`         | `@nestjs/typeorm`, `typeorm` |
+| **openapi**   | `@nestjs/common`                         | `@nestjs/swagger`            |
+| **response**  | `@nestjs/common`                         | -                            |
+| **validator** | `@nestjs/common`                         | `zod`                        |
+| **errors**    | `@nestjs/common`                         | -                            |
+| **types**     | -                                        | -                            |
+| **constants** | -                                        | -                            |
+| **utils**     | `@nestjs/common`, `zod`                  | -                            |
 
 All peer dependencies are marked as **optional** in `peerDependenciesMeta`, so you only need to install what you use.
 

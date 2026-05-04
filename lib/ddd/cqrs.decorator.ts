@@ -1,6 +1,5 @@
 import { Type } from '@nestjs/common';
-import { COMMAND_HANDLER_METADATA } from './command-bus';
-import { QUERY_HANDLER_METADATA } from './query-bus';
+import { COMMAND_HANDLER_METADATA, QUERY_HANDLER_METADATA, SAGA_METADATA } from './common/metadata';
 
 /**
  * Decorator to mark a class as a command handler
@@ -22,12 +21,10 @@ export const QueryHandler = (query: Type): ClassDecorator => {
   };
 };
 
-import { SAGA_METADATA } from './domain-event-bus';
-
 /**
  * Decorator to mark a method as a saga
  * Sagas are reactive workflows that listen to events and dispatch commands
- * 
+ *
  * @example
  * ```typescript
  * @Injectable()

@@ -1,5 +1,7 @@
 import { Injectable, Type, Logger, OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { QUERY_HANDLER_METADATA } from './common/metadata';
+import { getModuleProviders } from './utils/provider-discovery.util';
 
 export interface IQuery {}
 
@@ -7,20 +9,7 @@ export interface IQueryHandler<TQuery extends IQuery = IQuery, TResult = unknown
   execute(query: TQuery): Promise<TResult>;
 }
 
-export const QUERY_HANDLER_METADATA = '__queryHandler__';
-
-interface HandlerWrapper {
-  instance?: unknown;
-  metatype?: Type<unknown>;
-}
-
-interface ModuleProviderMap {
-  providers: Map<unknown, HandlerWrapper>;
-}
-
-interface NestContainerLike {
-  getModules(): Map<unknown, ModuleProviderMap>;
-}
+export { QUERY_HANDLER_METADATA } from './common/metadata';
 
 @Injectable()
 export class QueryBus implements OnModuleInit {
@@ -49,16 +38,13 @@ export class QueryBus implements OnModuleInit {
     }
 
     this.logger.debug(`Executing query: ${queryName}`);
-    return await handler.execute(query) as TResult;
+    return (await handler.execute(query)) as TResult;
   }
 
   /**
    * Register a query handler
    */
-  bind<TQuery extends IQuery = IQuery>(
-    handler: IQueryHandler<TQuery>,
-    query: Type<TQuery>,
-  ): void {
+  bind<TQuery extends IQuery = IQuery>(handler: IQueryHandler<TQuery>, query: Type<TQuery>): void {
     this.handlers.set(query.name, handler);
   }
 
@@ -66,13 +52,7 @@ export class QueryBus implements OnModuleInit {
    * Automatically discover and register all query handlers
    */
   private async register(): Promise<void> {
-    const container = this.moduleRef['container'] as NestContainerLike;
-    const providers = [...container.getModules().values()]
-      .map((module) => module.providers)
-      .reduce<Map<unknown, HandlerWrapper>>((acc, map) => {
-        map.forEach((value, key) => acc.set(key, value));
-        return acc;
-      }, new Map<unknown, HandlerWrapper>());
+    const providers = getModuleProviders(this.moduleRef);
 
     providers.forEach((wrapper) => {
       const { instance, metatype } = wrapper;
@@ -80,7 +60,9 @@ export class QueryBus implements OnModuleInit {
         return;
       }
 
-      const query = Reflect.getMetadata(QUERY_HANDLER_METADATA, metatype) as Type<IQuery> | undefined;
+      const query = Reflect.getMetadata(QUERY_HANDLER_METADATA, metatype) as
+        | Type<IQuery>
+        | undefined;
       if (!query) {
         return;
       }
