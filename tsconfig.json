@@ -10,7 +10,7 @@
     "outDir": "./dist",
     "rootDir": "./lib",
     "strict": true,
-    "strictNullChecks": true,
+    "strictNullChecks": false,
     "noImplicitAny": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

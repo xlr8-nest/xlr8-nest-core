@@ -12,6 +12,7 @@
 - 🏗️ **Event Module & CQRS**: Domain events, aggregate roots, and Command/Query buses
 - 📦 **Unit of Work**: TypeORM extensions with UoW pattern using AsyncLocalStorage
 - 🔄 **Event-Driven**: Domain events with Saga pattern support
+- 📬 **Outbox & Messaging**: Transactional outbox pattern with background worker, retries, and pluggable brokers
 - 📝 **OpenAPI**: Pre-configured Swagger decorators for standardized API documentation
 - ✅ **Validation**: Seamless Zod integration with NestJS pipes
 - 🗄️ **Database**: Migration & Seeder services with CLI commands
@@ -273,11 +274,15 @@ TypeORM extension module with Unit of Work pattern.
 import {
   DatabaseExtensionModule,
   TypeOrmClient,
+  IUnitOfWork,
+  IUnitOfWorkToken,
+  InjectUnitOfWork,
   UnitOfWork,
   MigrationService,
   SeederService,
   BaseSeeder,
   BaseFactory,
+  BaseOrm,
 } from '@xlr8-nest/core/database';
 ```
 
@@ -285,7 +290,7 @@ import {
 
 - Unit of Work pattern with AsyncLocalStorage
 - Migration & Seeder services with CLI commands
-- Base classes for seeders and factories
+- Base classes for seeders, factories, and ORM entities (`BaseOrm` for partial-constructor TypeORM entities)
 - Support for PostgreSQL, MySQL, MariaDB, SQLite, MSSQL
 - Auto-run migrations and seeders
 - Transaction isolation per request
@@ -319,7 +324,296 @@ export class UserSeeder extends BaseSeeder {
     await this.manager.save(User, users);
   }
 }
+
+// Use BaseOrm for partial-constructor TypeORM entities
+@Entity('users')
+export class UserOrm extends BaseOrm<UserOrm> {
+  @PrimaryColumn({ type: 'uuid' })
+  id: string;
+
+  @Column()
+  email: string;
+
+  @Column()
+  name: string;
+}
+
+// Construct with any subset of fields — useful for adapter mapping
+const orm = new UserOrm({ id, email });
 ```
+
+### 📬 Messaging (`@xlr8-nest/core/messaging`)
+
+Transactional outbox pattern for reliable cross-service event delivery. Domain events raised by your aggregates are translated into versioned **integration events** and persisted to an outbox table inside the same DB transaction as the aggregate state — guaranteeing at-least-once delivery to downstream services.
+
+```typescript
+import {
+  MessagingModule,
+  OutboxPublisher,
+  IntegrationEvent,
+  IDomainEventTranslator,
+  IMessagePublisher,
+  OutboxEventRecord,
+  ConsoleMessagePublisher,
+} from '@xlr8-nest/core/messaging';
+```
+
+**Features:**
+
+- Two clearly separated event types:
+  - **Domain events** (in-process, transient) — already provided by `@xlr8-nest/core/ddd`
+  - **Integration events** (cross-service, durable) — new contracts versioned per consumer
+- `IntegrationEvent` base class with stable `id`, `eventName`, `aggregateType`, `aggregateId`, `occurredAt`
+- `IDomainEventTranslator` pattern to map domain events → 0+ integration events
+- `OutboxPublisher`: pulls events from an aggregate, translates, and atomically stashes them inside the active `UnitOfWork.transaction()`
+- `OutboxEventOrm` mapping for the `outbox_events` table (you write the migration)
+- `OutboxWorker`: background poller with exponential backoff retry (configurable interval, batch size, backoff)
+- Concurrent worker support via `SELECT ... FOR UPDATE SKIP LOCKED`
+- Pluggable `IMessagePublisher` — default `ConsoleMessagePublisher` logs to stdout; swap for Kafka, RabbitMQ, SNS, NATS, etc.
+- One-line module wiring via `MessagingModule.forRoot({ translators, messagePublisher, worker })`
+
+**The flow:**
+
+```
+Application handler:
+  uow.transaction(async () => {
+    await repo.save(aggregate);          // step 1: persist aggregate
+    await outbox.publishFrom(aggregate); // step 2: pull events → translate → stash to outbox
+  });                                    // step 3: COMMIT (atomic)
+
+Background:
+  OutboxWorker polls outbox → MessagePublisher.publish() → mark PUBLISHED
+                                                     └── on failure → exponential backoff retry
+```
+
+**Example:**
+
+```typescript
+import { Injectable, Inject } from '@nestjs/common';
+import {
+  IntegrationEvent,
+  IDomainEventTranslator,
+  OutboxPublisher,
+  MessagingModule,
+} from '@xlr8-nest/core/messaging';
+import {
+  IUnitOfWork,
+  IUnitOfWorkToken,
+} from '@xlr8-nest/core/database';
+import { CommandHandler, EventBus, DomainEvent } from '@xlr8-nest/core/ddd';
+
+// 1. Define an integration event (the cross-service contract)
+export class UserRegisteredIntegrationEvent extends IntegrationEvent {
+  readonly eventName = 'user.registered.v1';
+  readonly aggregateType = 'user';
+  readonly aggregateId: string;
+
+  constructor(
+    public readonly userId: string,
+    public readonly email: string,
+  ) {
+    super();
+    this.aggregateId = userId;
+  }
+}
+
+// 2. Define a translator: domain event → integration event(s)
+@Injectable()
+export class UserEventTranslator implements IDomainEventTranslator {
+  supports(eventName: string): boolean {
+    return eventName === 'user.created';
+  }
+
+  translate(event: DomainEvent): IntegrationEvent[] {
+    if (event instanceof UserCreatedEvent) {
+      return [new UserRegisteredIntegrationEvent(event.userId, event.email)];
+    }
+    return [];
+  }
+}
+
+// 3. Wire up the messaging module
+@Module({
+  imports: [
+    MessagingModule.forRoot({
+      translators: [UserEventTranslator],
+      // messagePublisher: KafkaMessagePublisher, // optional; defaults to ConsoleMessagePublisher
+      // worker: { pollIntervalMs: 2000, batchSize: 25 }, // optional tuning
+    }),
+  ],
+})
+export class AppModule {}
+
+// 4. Use the OutboxPublisher in your command handler
+@CommandHandler(CreateUserCommand)
+export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
+  constructor(
+    private readonly userRepo: UserRepository,
+    @Inject(IUnitOfWorkToken) private readonly uow: IUnitOfWork,
+    private readonly outbox: OutboxPublisher,
+    private readonly eventBus: EventBus,
+  ) {}
+
+  async execute(command: CreateUserCommand) {
+    const user = User.create(command.name, command.email);
+
+    // Single atomic transaction: aggregate + integration events committed together
+    const domainEvents = await this.uow.transaction(async () => {
+      await this.userRepo.save(user);
+      return this.outbox.publishFrom(user);
+    });
+
+    // After commit, dispatch domain events to in-process listeners
+    // (logging, metrics, projectors). Cross-service delivery is already in the outbox.
+    for (const event of domainEvents) {
+      this.eventBus.publish(event);
+    }
+  }
+}
+```
+
+**Custom message publisher (Kafka example):**
+
+```typescript
+@Injectable()
+export class KafkaMessagePublisher implements IMessagePublisher {
+  constructor(private readonly kafka: KafkaClient) {}
+
+  async publish(record: OutboxEventRecord): Promise<void> {
+    await this.kafka.send({
+      topic: record.eventName,
+      key: record.aggregateId,
+      messages: [{
+        value: JSON.stringify(record.payload),
+        headers: { 'event-id': record.id }, // stable across retries — use as dedupe key
+      }],
+    });
+    // throw on broker rejection so the worker records the failure and schedules a retry
+  }
+}
+```
+
+**Outbox CLI (`outbox` command):**
+
+The messaging module ships an `outbox` CLI command (powered by `nest-commander`) that you wire into your existing CLI bootstrap alongside `migration` and `seed`:
+
+```typescript
+// cli.ts
+import { CommandFactory } from 'nest-commander';
+import { CliModule } from './cli.module';
+
+async function bootstrap() {
+  await CommandFactory.run(CliModule, ['warn', 'error', 'log']);
+}
+bootstrap();
+```
+
+```typescript
+// cli.module.ts
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    DatabaseExtensionModule.registerAsync({ useFactory: () => ({ /* ... */ }) }),
+    MessagingModule.forRoot({
+      translators: [/* ... */],
+      // cli: true is the default — the `outbox` command is registered automatically
+    }),
+  ],
+})
+export class CliModule {}
+```
+
+Then in `package.json`:
+
+```json
+{
+  "scripts": {
+    "cli": "ts-node -r tsconfig-paths/register src/cli.ts"
+  }
+}
+```
+
+**Available outbox commands:**
+
+```bash
+# Generate the outbox_events table migration into the configured migrations path
+npm run cli -- outbox migration
+npm run cli -- outbox migration --name AddOutboxTable
+npm run cli -- outbox migration --path ./src/db/migrations
+
+# Show counts (pending / published / failed / due-now)
+npm run cli -- outbox status
+
+# Reset all FAILED events back to PENDING for immediate retry
+npm run cli -- outbox requeue-failed
+
+# Help
+npm run cli -- outbox
+```
+
+**Example output of `outbox status`:**
+
+```
+📊 Outbox Status
+
+  Pending:   3
+  Published: 142
+  Failed:    1
+  Due now:   3  (will be picked up by the next worker tick)
+
+⚠️  There are failed events. Inspect them, then run:
+     <prefix> outbox requeue-failed
+```
+
+**Using `OutboxAdminService` programmatically:**
+
+The same logic is exposed via `OutboxAdminService` for non-CLI use (admin dashboards, health checks, etc.):
+
+```typescript
+@Injectable()
+export class AdminService {
+  constructor(private readonly outboxAdmin: OutboxAdminService) {}
+
+  async getOutboxHealth() {
+    const stats = await this.outboxAdmin.getStats();
+    return {
+      backlog: stats.pending,
+      stuck: stats.failed,
+      throughput: stats.published,
+    };
+  }
+}
+```
+
+**Required migration in your service:**
+
+The CLI command above generates this for you. You can also create it by hand — the schema must match `OutboxEventOrm`:
+
+```sql
+CREATE TYPE outbox_events_status_enum AS ENUM ('pending', 'published', 'failed');
+
+CREATE TABLE outbox_events (
+  id              uuid PRIMARY KEY,
+  event_name      varchar(255) NOT NULL,
+  aggregate_type  varchar(100) NOT NULL,
+  aggregate_id    varchar(255) NOT NULL,
+  payload         jsonb NOT NULL,
+  status          outbox_events_status_enum NOT NULL DEFAULT 'pending',
+  retry_count     integer NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL,
+  last_error      text,
+  occurred_at     timestamptz NOT NULL,
+  published_at    timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_outbox_events_due ON outbox_events (status, next_attempt_at);
+```
+
+**Retry strategy:**
+
+Failed publishes are retried with exponential backoff (defaults: 30s → 60s → 2m → 4m → ... capped at 1 hour). After 10 failed attempts the row transitions to `status='failed'` and is no longer retried automatically — surface these for operator inspection via a dashboard query on `WHERE status = 'failed'`.
 
 ### 🚨 Errors (`@xlr8-nest/core/errors`)
 
@@ -703,17 +997,18 @@ async update(
 
 This package requires the following peer dependencies based on which modules you use:
 
-| Module        | Required Dependencies                    | Optional                     |
-| ------------- | ---------------------------------------- | ---------------------------- |
-| **ddd**       | `@nestjs/common`, `@nestjs/core`, `rxjs` | `@nestjs/event-emitter`      |
-| **database**  | `@nestjs/common`, `@nestjs/core`         | `@nestjs/typeorm`, `typeorm` |
-| **openapi**   | `@nestjs/common`                         | `@nestjs/swagger`            |
-| **response**  | `@nestjs/common`                         | -                            |
-| **validator** | `@nestjs/common`                         | `zod`                        |
-| **errors**    | `@nestjs/common`                         | -                            |
-| **types**     | -                                        | -                            |
-| **constants** | -                                        | -                            |
-| **utils**     | `@nestjs/common`, `zod`                  | -                            |
+| Module        | Required Dependencies                              | Optional                     |
+| ------------- | -------------------------------------------------- | ---------------------------- |
+| **ddd**       | `@nestjs/common`, `@nestjs/core`, `rxjs`           | `@nestjs/event-emitter`      |
+| **database**  | `@nestjs/common`, `@nestjs/core`                   | `@nestjs/typeorm`, `typeorm` |
+| **messaging** | `@nestjs/common`, `@nestjs/core`, `@nestjs/typeorm`, `typeorm` | -                |
+| **openapi**   | `@nestjs/common`                                   | `@nestjs/swagger`            |
+| **response**  | `@nestjs/common`                                   | -                            |
+| **validator** | `@nestjs/common`                                   | `zod`                        |
+| **errors**    | `@nestjs/common`                                   | -                            |
+| **types**     | -                                                  | -                            |
+| **constants** | -                                                  | -                            |
+| **utils**     | `@nestjs/common`, `zod`                            | -                            |
 
 All peer dependencies are marked as **optional** in `peerDependenciesMeta`, so you only need to install what you use.
 

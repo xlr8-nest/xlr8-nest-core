@@ -7,6 +7,7 @@ export default defineConfig({
     'utils/index': 'lib/core/utils/index.ts',
     'ddd/index': 'lib/ddd/index.ts',
     'database/index': 'lib/database/index.ts',
+    'messaging/index': 'lib/messaging/index.ts',
     'errors/index': 'lib/errors/index.ts',
     'openapi/index': 'lib/openapi/index.ts',
     'response/index': 'lib/response/index.ts',
