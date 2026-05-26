@@ -1,26 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AggregateRoot } from '../ddd/aggregate-root';
 import { DomainEvent } from '../ddd/domain-event';
-import { Identifier } from '../ddd/type';
 import { DomainEventTranslatorRegistry } from './domain-event-translator.registry';
 import { IntegrationEvent } from './integration-event';
 import { type IOutboxRepository, OutboxRepositoryToken } from './outbox.repository';
 
 /**
- * Bridges domain events to the outbox.
+ * Persists integration events derived from domain events into the outbox table.
  *
- * Application handlers call `publishFrom(aggregate)` inside their
- * `uow.transaction(...)` block, AFTER persisting the aggregate. The publisher:
- *   1. Pulls domain events from the aggregate.
- *   2. Translates them to integration events via the registered translators.
- *   3. Writes the integration events into the outbox table in the same transaction.
+ * Single responsibility: translate domain events → integration events → outbox row.
+ * In-process domain event dispatch is the caller's responsibility, not this class.
  *
- * This guarantees that aggregate state and outbox entries either both commit or
- * both roll back — the cornerstone of the outbox pattern.
+ * Correct handler pattern (inside uow.transaction()):
  *
- * The pulled domain events are also returned so the caller can publish them
- * through the in-process EventBus (for non-transactional listeners like logging
- * or metrics) AFTER the transaction commits.
+ *   const domainEvents = aggregate.pullEvents();
+ *   await this.eventBus.publishAll(domainEvents);   // domain events first (internal)
+ *   await this.outbox.publishEvents(domainEvents);  // integration events second (external)
+ *
+ * Domain events dispatch first because they represent what happened inside the
+ * domain; integration events are the external consequence derived from them.
+ * Both run inside the same transaction, so they commit or roll back together.
  */
 @Injectable()
 export class OutboxPublisher {
@@ -30,14 +28,7 @@ export class OutboxPublisher {
     private readonly outboxRepo: IOutboxRepository,
   ) {}
 
-  /** Convenience: pull, translate, and stash in one call. */
-  async publishFrom(aggregate: AggregateRoot<Identifier>): Promise<DomainEvent[]> {
-    const events = aggregate.pullEvents();
-    await this.publishEvents(events);
-    return events;
-  }
-
-  /** Lower-level: translate already-pulled events and stash. */
+  /** Translate already-pulled domain events to integration events and write to outbox. */
   async publishEvents(events: DomainEvent[]): Promise<void> {
     if (events.length === 0) return;
     const integrationEvents: IntegrationEvent[] = this.translators.translateAll(events);
