@@ -129,6 +129,7 @@ export class DatabaseExtensionModule implements OnModuleInit {
         SeederCommandRunner,
       ],
       exports: [
+        DATABASE_MODULE_CONFIG,
         MigrationService,
         SeederService,
         MigrationCommandRunner,
