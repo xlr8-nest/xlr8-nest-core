@@ -1,8 +1,9 @@
 export * from './database-extension.module';
 
-// Contracts & decorators
+// Contracts, decorators & tokens
 export * from './types';
 export * from './decorators';
+export * from './constants';
 
 // Runtime integrations
 export * from './providers';

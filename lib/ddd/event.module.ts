@@ -1,4 +1,5 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
+import { DiscoveryModule } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { EventBus } from './event-bus';
 
@@ -60,6 +61,10 @@ export class EventModule {
     return {
       module: EventModule,
       imports: [
+        // DiscoveryModule provides DiscoveryService, which EventBus uses to scan
+        // for @Saga()-decorated providers. It must be imported here because this
+        // module is what instantiates EventBus.
+        DiscoveryModule,
         EventEmitterModule.forRoot(
           options || {
             // Default configuration

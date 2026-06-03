@@ -47,6 +47,13 @@ export class OutboxEventOrm extends BaseOrm<OutboxEventOrm> {
   @Column({ name: 'next_attempt_at', type: 'timestamptz' })
   nextAttemptAt: Date;
 
+  /**
+   * Lease expiry for the PROCESSING state. If a worker crashes after claiming a
+   * row, another worker will re-claim it once this timestamp passes.
+   */
+  @Column({ name: 'locked_until', type: 'timestamptz', nullable: true })
+  lockedUntil?: Date | null;
+
   @Column({ name: 'last_error', type: 'text', nullable: true })
   lastError?: string | null;
 

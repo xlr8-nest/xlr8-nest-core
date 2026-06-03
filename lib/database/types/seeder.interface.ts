@@ -1,5 +1,14 @@
 import { DataSource, EntityManager } from 'typeorm';
 
+/** Validates that a name is a safe SQL identifier (prevents injection). */
+function assertSafeIdentifier(name: string): void {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(
+      `Unsafe SQL identifier "${name}". Only letters, digits, and underscores are allowed.`,
+    );
+  }
+}
+
 /**
  * Abstract base class for seeders
  * DataSource is injected via constructor for better DI support
@@ -17,9 +26,11 @@ export abstract class Seeder {
   abstract run(): Promise<void>;
 
   /**
-   * Clear a table (truncate with cascade)
+   * Clear a table (truncate with cascade). tableName must be a simple identifier.
+   * @throws Error when tableName contains characters outside `[A-Za-z0-9_]`
    */
   protected async clearTable(tableName: string): Promise<void> {
+    assertSafeIdentifier(tableName);
     await this.dataSource.query(`TRUNCATE TABLE "${tableName}" CASCADE`);
   }
 

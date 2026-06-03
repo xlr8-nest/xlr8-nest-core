@@ -90,11 +90,14 @@ export const normalizeUnknownException = <
   }
 
   if (exception instanceof Error) {
+    // Do not forward the raw Error.message to the client — it can expose
+    // internal details (SQL errors, stack fragments, file paths). Use the
+    // safe fallback message and leave logging to the caller.
     return {
       statusCode: fallbackStatusCode,
       error: {
         code: fallbackError.code,
-        message: exception.message || fallbackError.message,
+        message: fallbackError.message,
       },
       errors: options.fallbackErrors,
     };

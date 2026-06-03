@@ -9,7 +9,14 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "./dist/ddd/index.js",
+    "./dist/ddd/index.mjs",
+    "./dist/authz/index.js",
+    "./dist/authz/index.mjs"
   ],
   "exports": {
     ".": {
@@ -131,6 +138,16 @@
         "types": "./dist/validator/index.d.ts",
         "default": "./dist/validator/index.js"
       }
+    },
+    "./authz": {
+      "import": {
+        "types": "./dist/authz/index.d.mts",
+        "default": "./dist/authz/index.mjs"
+      },
+      "require": {
+        "types": "./dist/authz/index.d.ts",
+        "default": "./dist/authz/index.js"
+      }
     }
   },
   "scripts": {
@@ -147,6 +164,9 @@
     "@nestjs/event-emitter": "^2.0.0 || ^3.0.0 || ^4.0.0",
     "@nestjs/swagger": "^6.0.0 || ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0",
     "@nestjs/typeorm": "^9.0.0 || ^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@sqltools/formatter": "^1.0.0",
+    "@faker-js/faker": "^8.0.0 || ^9.0.0 || ^10.0.0",
+    "nest-commander": "^3.0.0",
     "reflect-metadata": "^0.1.13 || ^0.2.0 || ^0.3.0",
     "rxjs": "^7.0.0 || ^8.0.0",
     "typeorm": "^0.3.0 || ^0.4.0",
@@ -160,6 +180,15 @@
       "optional": true
     },
     "@nestjs/typeorm": {
+      "optional": true
+    },
+    "@sqltools/formatter": {
+      "optional": true
+    },
+    "@faker-js/faker": {
+      "optional": true
+    },
+    "nest-commander": {
       "optional": true
     },
     "reflect-metadata": {

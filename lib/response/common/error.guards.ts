@@ -14,8 +14,15 @@ export const isErrorDetails = (value: unknown): value is ErrorDetails => {
   return Object.values(value).every(isDetailError);
 };
 
+/**
+ * True when `value` is a library BaseError (has statusCode + code + message AND is
+ * an Error instance). Requires `instanceof Error` so arbitrary POJOs with the same
+ * shape are not misclassified, and NestJS HttpException subclasses (which also carry
+ * statusCode) are not accidentally matched before the HttpException branch.
+ */
 export const isBaseErrorLike = (value: unknown): value is BaseError<ErrorDetails | undefined, string> => {
   return (
+    value instanceof Error &&
     isRecord(value) &&
     typeof value.statusCode === 'number' &&
     typeof value.code === 'string' &&

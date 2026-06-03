@@ -9,8 +9,9 @@ export interface ErrorType<TCode extends string = string> {
 
 /**
  * Field-level error entry inside an `errors` map.
+ * Alias of ErrorType — kept for named clarity at call sites.
  */
-export interface DetailError<TCode extends string = string> extends ErrorType<TCode> {}
+export type DetailError<TCode extends string = string> = ErrorType<TCode>;
 
 /**
  * Structured field-level validation or domain errors keyed by field name.

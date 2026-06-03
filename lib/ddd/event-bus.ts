@@ -1,6 +1,6 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ModuleRef } from '@nestjs/core';
+import { DiscoveryService } from '@nestjs/core';
 import { DomainEvent } from './domain-event';
 import { getEventName } from './domain-event.decorator';
 import { Subject, Subscription } from 'rxjs';
@@ -12,8 +12,7 @@ import type {
   IEventBus,
   ISaga,
 } from './common/event-bus.type';
-import { getModuleProviders } from './utils/provider-discovery.util';
-import { getSagas } from './utils/saga-discovery.util';
+import { SAGA_METADATA } from './common/metadata';
 
 export type { DomainEventHandler, IEventBus, ISaga } from './common/event-bus.type';
 export { SAGA_METADATA } from './common/metadata';
@@ -54,20 +53,30 @@ export { SAGA_METADATA } from './common/metadata';
  * ```
  */
 @Injectable()
-export class EventBus implements IEventBus, OnModuleInit {
+export class EventBus implements IEventBus, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventBus.name);
   private readonly subject$ = new Subject<DomainEvent>();
   private sagas: Array<ISaga<DomainEvent>> = [];
   private readonly connectedSagas = new Set<ISaga<DomainEvent>>();
+  private readonly subscriptions: Subscription[] = [];
   private commandBus?: CommandBusLike;
 
   constructor(
     private readonly eventEmitter: EventEmitter2,
-    private readonly moduleRef: ModuleRef,
+    private readonly discoveryService: DiscoveryService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    await this.setupSagas();
+  onModuleInit(): void {
+    this.setupSagas();
+  }
+
+  onModuleDestroy(): void {
+    // Unsubscribe all tracked RxJS subscriptions to prevent memory leaks
+    for (const sub of this.subscriptions) {
+      sub.unsubscribe();
+    }
+    this.subscriptions.length = 0;
+    this.subject$.complete();
   }
 
   /**
@@ -110,11 +119,13 @@ export class EventBus implements IEventBus, OnModuleInit {
     eventType: EventConstructor<T>,
     handler: DomainEventHandler<T>,
   ): Subscription {
-    return this.subject$
+    const sub = this.subject$
       .pipe(filter((event): event is T => event instanceof eventType))
       .subscribe((event) => {
         void Promise.resolve(handler(event));
       });
+    this.subscriptions.push(sub);
+    return sub;
   }
 
   /**
@@ -126,23 +137,45 @@ export class EventBus implements IEventBus, OnModuleInit {
   }
 
   /**
-   * Setup sagas - discover and register all sagas
+   * Discover and register all @Saga()-decorated members using the official
+   * DiscoveryService instead of private container internals.
+   *
+   * Scans candidate keys from BOTH the prototype (regular methods) and the
+   * instance (arrow-function properties bound in the constructor — the form the
+   * @Saga() JSDoc advertises). The SAGA_METADATA flag is read with the instance
+   * as the target so it resolves through the prototype chain regardless of where
+   * the saga function value lives.
    */
-  private async setupSagas(): Promise<void> {
-    const providers = getModuleProviders(this.moduleRef);
+  private setupSagas(): void {
+    const providers = this.discoveryService.getProviders();
+    const seen = new Set<object>();
 
-    providers.forEach((wrapper) => {
+    for (const wrapper of providers) {
       const { instance } = wrapper;
-      if (typeof instance !== 'object' || instance === null) {
-        return;
-      }
+      if (typeof instance !== 'object' || instance === null || seen.has(instance)) continue;
+      seen.add(instance);
 
-      const sagas = getSagas(instance);
-      sagas.forEach((saga) => {
-        this.registerSaga(saga.bind(instance) as ISaga<DomainEvent>);
-        this.logger.log(`Registered saga: ${instance.constructor.name}.${saga.name}`);
-      });
-    });
+      const prototype = Object.getPrototypeOf(instance) as object | null;
+      const candidateKeys = new Set<string>([
+        ...(prototype ? Object.getOwnPropertyNames(prototype) : []),
+        ...Object.getOwnPropertyNames(instance),
+      ]);
+
+      for (const methodName of candidateKeys) {
+        if (methodName === 'constructor') continue;
+
+        const hasSagaMeta = Reflect.getMetadata(SAGA_METADATA, instance, methodName) as unknown;
+        if (!hasSagaMeta) continue;
+
+        const candidate = (instance as Record<string, unknown>)[methodName];
+        if (typeof candidate !== 'function') continue;
+
+        this.registerSaga((candidate as ISaga<DomainEvent>).bind(instance) as ISaga<DomainEvent>);
+        this.logger.log(
+          `Registered saga: ${(instance as { constructor: { name: string } }).constructor.name}.${methodName}`,
+        );
+      }
+    }
 
     this.connectSagasToCommandBus();
   }
@@ -158,10 +191,17 @@ export class EventBus implements IEventBus, OnModuleInit {
 
     this.connectedSagas.add(saga);
     const command$ = saga(this.subject$);
-    command$.subscribe((command) => {
-      void this.commandBus?.execute(command).catch((err: Error) => {
-        this.logger.error(`Saga command execution failed: ${err.message}`, err.stack);
-      });
+    const sub = command$.subscribe({
+      next: (command) => {
+        void this.commandBus?.execute(command).catch((err: Error) => {
+          this.logger.error(`Saga command execution failed: ${err.message}`, err.stack);
+        });
+      },
+      error: (err: Error) => {
+        // Keep the outer subscription alive; the saga observable errored.
+        this.logger.error(`Saga observable errored: ${err.message}`, err.stack);
+      },
     });
+    this.subscriptions.push(sub);
   }
 }

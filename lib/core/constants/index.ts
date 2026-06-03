@@ -14,7 +14,10 @@ export enum StatusCode {
   FORBIDDEN = 403,
   NOT_FOUND = 404,
   CONFLICT = 409,
+  UNPROCESSABLE_ENTITY = 422,
+  TOO_MANY_REQUESTS = 429,
   INTERNAL_SERVER_ERROR = 500,
+  SERVICE_UNAVAILABLE = 503,
 }
 
 /**
@@ -41,9 +44,21 @@ export const CommonErrors = {
     code: 'CONFLICT',
     message: 'Resource conflict',
   },
+  UnprocessableEntityError: {
+    code: 'UNPROCESSABLE_ENTITY',
+    message: 'Unprocessable entity',
+  },
+  TooManyRequestsError: {
+    code: 'TOO_MANY_REQUESTS',
+    message: 'Too many requests',
+  },
   InternalServerError: {
     code: 'INTERNAL_SERVER_ERROR',
     message: 'Internal server error',
+  },
+  ServiceUnavailableError: {
+    code: 'SERVICE_UNAVAILABLE',
+    message: 'Service temporarily unavailable',
   },
 } as const satisfies Record<string, ErrorType>;
 

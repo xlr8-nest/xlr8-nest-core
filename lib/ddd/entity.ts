@@ -6,7 +6,12 @@ export abstract class Entity<T extends Identifier>{
   constructor(id: T) {
     this._id = id;
   }
-  
+
+  /** The entity's unique identifier. Alias of {@link getId}. */
+  get id(): T {
+    return this._id;
+  }
+
   getId(): T {
     return this._id;
   }

@@ -17,6 +17,8 @@ export interface GenerateOutboxMigrationOptions {
 
 export interface OutboxStats {
   pending: number;
+  /** Rows currently being published (PROCESSING state; should drain quickly). */
+  processing: number;
   published: number;
   failed: number;
   /** PENDING rows whose next_attempt_at has passed — what the worker will pick up next. */
@@ -75,19 +77,26 @@ export class OutboxAdminService {
 
   /** Snapshot of the outbox table's status distribution. */
   async getStats(): Promise<OutboxStats> {
-    const repo = this.dataSource.getRepository(OutboxEventOrm);
     const now = new Date();
-    const [pending, published, failed, dueNow] = await Promise.all([
-      repo.count({ where: { status: OutboxEventStatus.PENDING } }),
-      repo.count({ where: { status: OutboxEventStatus.PUBLISHED } }),
-      repo.count({ where: { status: OutboxEventStatus.FAILED } }),
-      repo
-        .createQueryBuilder('o')
-        .where('o.status = :status', { status: OutboxEventStatus.PENDING })
-        .andWhere('o.next_attempt_at <= :now', { now })
-        .getCount(),
-    ]);
-    return { pending, published, failed, dueNow };
+    // Single grouped query for pending/processing/published/failed counts
+    const rows: Array<{ status: string; cnt: string }> = await this.dataSource.query(
+      `SELECT status, COUNT(*) AS cnt FROM outbox_events GROUP BY status`,
+    );
+    const byStatus: Record<string, number> = {};
+    for (const row of rows) byStatus[row.status] = Number(row.cnt);
+
+    const dueNow: [{ cnt: string }] = await this.dataSource.query(
+      `SELECT COUNT(*) AS cnt FROM outbox_events WHERE status = $1 AND next_attempt_at <= $2`,
+      [OutboxEventStatus.PENDING, now],
+    );
+
+    return {
+      pending: byStatus[OutboxEventStatus.PENDING] ?? 0,
+      processing: byStatus[OutboxEventStatus.PROCESSING] ?? 0,
+      published: byStatus[OutboxEventStatus.PUBLISHED] ?? 0,
+      failed: byStatus[OutboxEventStatus.FAILED] ?? 0,
+      dueNow: Number(dueNow[0]?.cnt ?? 0),
+    };
   }
 
   /**
@@ -120,7 +129,7 @@ export class ${className} implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(\`
       CREATE TYPE "public"."outbox_events_status_enum"
-        AS ENUM('pending', 'published', 'failed')
+        AS ENUM('pending', 'processing', 'published', 'failed')
     \`);
 
     await queryRunner.query(\`
@@ -133,6 +142,7 @@ export class ${className} implements MigrationInterface {
         "status"          "public"."outbox_events_status_enum"       NOT NULL DEFAULT 'pending',
         "retry_count"     integer                                    NOT NULL DEFAULT 0,
         "next_attempt_at" TIMESTAMP WITH TIME ZONE                   NOT NULL,
+        "locked_until"    TIMESTAMP WITH TIME ZONE,
         "last_error"      text,
         "occurred_at"     TIMESTAMP WITH TIME ZONE                   NOT NULL,
         "published_at"    TIMESTAMP WITH TIME ZONE,
@@ -142,9 +152,12 @@ export class ${className} implements MigrationInterface {
       )
     \`);
 
+    -- Partial index: only tracks the live working set (pending/processing rows).
+    -- Scales independently of how many published rows accumulate.
     await queryRunner.query(\`
       CREATE INDEX "idx_outbox_events_due"
         ON "outbox_events" ("status", "next_attempt_at")
+        WHERE status IN ('pending', 'processing')
     \`);
   }
 

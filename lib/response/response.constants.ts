@@ -23,7 +23,10 @@ export const ERROR_DEFAULTS = {
   [StatusCode.FORBIDDEN]: CommonErrors.ForbiddenError,
   [StatusCode.NOT_FOUND]: CommonErrors.NotFoundError,
   [StatusCode.CONFLICT]: CommonErrors.ConflictError,
+  [StatusCode.UNPROCESSABLE_ENTITY]: CommonErrors.UnprocessableEntityError,
+  [StatusCode.TOO_MANY_REQUESTS]: CommonErrors.TooManyRequestsError,
   [StatusCode.INTERNAL_SERVER_ERROR]: CommonErrors.InternalServerError,
+  [StatusCode.SERVICE_UNAVAILABLE]: CommonErrors.ServiceUnavailableError,
 } as const;
 
 type SuccessCodeMap = typeof SUCCESS_CODE_MAP;

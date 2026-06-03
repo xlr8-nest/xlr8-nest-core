@@ -9,6 +9,7 @@ export * from './value-object';
 export * from './type';
 
 // CQRS Support
+export * from './abstract-message-bus';
 export * from './command-bus';
 export * from './query-bus';
 export * from './cqrs.decorator';

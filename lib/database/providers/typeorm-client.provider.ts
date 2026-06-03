@@ -32,8 +32,14 @@ export class TypeOrmClient implements IUnitOfWork {
     }
   }
 
-  get client(): EntityManager {
+  /** The active transactional EntityManager, or the default DataSource.manager outside a transaction. */
+  get manager(): EntityManager {
     const queryRunner = this.asyncLocalStorage.getStore();
     return queryRunner ? queryRunner.manager : this.dataSource.manager;
+  }
+
+  /** @deprecated Use `manager` instead. */
+  get client(): EntityManager {
+    return this.manager;
   }
 }

@@ -1,5 +1,8 @@
 import { ErrorDetails, ErrorType } from '../types/common/error.type';
 
+/** Non-enumerable brand symbol for reliable cross-realm BaseError detection. */
+export const BASE_ERROR_BRAND = Symbol('xlr8-nest/BaseError');
+
 /**
  * Base application error that keeps the HTTP status code,
  * a stable `ErrorType`, and optional field-level details together.
@@ -16,5 +19,7 @@ export class BaseError<TErrors extends ErrorDetails | undefined = undefined, TCo
     this.statusCode = statusCode;
     this.errors = errors;
     Object.setPrototypeOf(this, new.target.prototype);
+    // Non-enumerable brand for cross-realm detection without structural duck-typing
+    Object.defineProperty(this, BASE_ERROR_BRAND, { value: true, enumerable: false, writable: false });
   }
 }

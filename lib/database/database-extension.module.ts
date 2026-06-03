@@ -1,4 +1,4 @@
-import { DynamicModule, Module, OnModuleInit, Inject } from '@nestjs/common';
+import { DynamicModule, Logger, Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { FactoryProvider, Provider } from '@nestjs/common/interfaces/modules/provider.interface';
 import type { ModuleMetadata } from '@nestjs/common/interfaces/modules/module-metadata.interface';
@@ -15,6 +15,16 @@ export interface DatabaseExtensionAsyncOptions {
     ...args: unknown[]
   ) => Promise<DatabaseModuleConfig> | DatabaseModuleConfig;
   global?: boolean;
+  /**
+   * Explicitly enable the migration service + CLI runner.
+   * When omitted the value comes from `config.migration?.enabled`.
+   */
+  migration?: boolean;
+  /**
+   * Explicitly enable the seeder service + CLI runner.
+   * When omitted the value comes from `config.seeder?.enabled`.
+   */
+  seeder?: boolean;
 }
 
 type MutableTypeOrmModuleOptions = TypeOrmModuleOptions & {
@@ -32,6 +42,8 @@ const typeOrmClientProviders: Provider[] = [
 
 @Module({})
 export class DatabaseExtensionModule implements OnModuleInit {
+  private readonly logger = new Logger(DatabaseExtensionModule.name);
+
   constructor(
     @Inject(DATABASE_MODULE_CONFIG) private readonly config: DatabaseModuleConfig,
     private readonly migrationService?: MigrationService,
@@ -39,22 +51,19 @@ export class DatabaseExtensionModule implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Auto-run migrations if enabled
+    // Auto-run migrations if enabled — throws on failure so the app does not
+    // boot against an un-migrated schema.
     if (this.config.migration?.autoRun && this.migrationService) {
-      try {
-        await this.migrationService.runMigrations();
-      } catch (error) {
-        console.error('Auto-migration failed:', error);
-      }
+      this.logger.log('Running auto-migrations…');
+      await this.migrationService.runMigrations();
+      this.logger.log('Auto-migrations complete.');
     }
 
-    // Auto-run seeders if enabled
+    // Auto-run seeders if enabled — throws on failure.
     if (this.config.seeder?.autoRun && this.seederService) {
-      try {
-        await this.seederService.runSeeders();
-      } catch (error) {
-        console.error('Auto-seeding failed:', error);
-      }
+      this.logger.log('Running auto-seeders…');
+      await this.seederService.runSeeders();
+      this.logger.log('Auto-seeders complete.');
     }
   }
 
@@ -96,9 +105,16 @@ export class DatabaseExtensionModule implements OnModuleInit {
   }
 
   /**
-   * Register database extension module asynchronously
+   * Register database extension module asynchronously.
+   *
+   * Use the `migration` and `seeder` flags to opt into the respective services
+   * when you cannot determine availability from the factory config at
+   * registration time (they default to false, matching the safe baseline).
    */
   static registerAsync(options: DatabaseExtensionAsyncOptions): DynamicModule {
+    const enableMigration = options.migration ?? false;
+    const enableSeeder = options.seeder ?? false;
+
     const providers: Provider[] = [
       {
         provide: DATABASE_MODULE_CONFIG,
@@ -107,6 +123,19 @@ export class DatabaseExtensionModule implements OnModuleInit {
       },
       ...typeOrmClientProviders,
     ];
+
+    const extraProviders: Provider[] = [];
+    const extraExports: NonNullable<ModuleMetadata['exports']> = [];
+
+    if (enableMigration) {
+      extraProviders.push(MigrationService, MigrationCommandRunner);
+      extraExports.push(MigrationService, MigrationCommandRunner);
+    }
+
+    if (enableSeeder) {
+      extraProviders.push(SeederService, SeederCommandRunner);
+      extraExports.push(SeederService, SeederCommandRunner);
+    }
 
     return {
       module: DatabaseExtensionModule,
@@ -121,21 +150,8 @@ export class DatabaseExtensionModule implements OnModuleInit {
           inject: options.inject || [],
         }),
       ],
-      providers: [
-        ...providers,
-        MigrationService,
-        SeederService,
-        MigrationCommandRunner,
-        SeederCommandRunner,
-      ],
-      exports: [
-        DATABASE_MODULE_CONFIG,
-        MigrationService,
-        SeederService,
-        MigrationCommandRunner,
-        SeederCommandRunner,
-        ...typeOrmClientProviders,
-      ],
+      providers: [...providers, ...extraProviders],
+      exports: [DATABASE_MODULE_CONFIG, ...typeOrmClientProviders, ...extraExports],
     };
   }
 

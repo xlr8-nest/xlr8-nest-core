@@ -13,6 +13,7 @@ export default defineConfig({
     'response/index': 'lib/response/index.ts',
     'types/index': 'lib/types/index.ts',
     'validator/index': 'lib/validator/index.ts',
+    'authz/index': 'lib/authz/index.ts',
   },
   format: ['cjs', 'esm'],
   dts: true,

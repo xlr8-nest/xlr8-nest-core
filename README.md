@@ -13,6 +13,7 @@
 - 📦 **Unit of Work**: TypeORM extensions with UoW pattern using AsyncLocalStorage
 - 🔄 **Event-Driven**: Domain events with Saga pattern support
 - 📬 **Outbox & Messaging**: Transactional outbox pattern with background worker, retries, and pluggable brokers
+- 🛡️ **Authorization**: Declarative RBAC, permission, policy, and resource/property-based access control behind one extensible guard
 - 📝 **OpenAPI**: Pre-configured Swagger decorators for standardized API documentation
 - ✅ **Validation**: Seamless Zod integration with NestJS pipes
 - 🗄️ **Database**: Migration & Seeder services with CLI commands
@@ -156,6 +157,33 @@ export class UserController {
   }
 }
 ```
+
+### 5. Authorization
+
+```typescript
+import { AuthzModule, RequireRoles, RequirePermissions } from '@xlr8-nest/core/authz';
+
+// Register once (global by default)
+@Module({
+  imports: [AuthzModule.forRoot({ registerGlobalGuard: true })],
+})
+export class AppModule {}
+
+// Then declare access on routes
+@Controller('users')
+export class UserController {
+  @Post()
+  @RequireRoles('admin')                 // RBAC
+  create() {}
+
+  @Patch(':id')
+  @RequirePermissions('user:write')      // permission-based (supports wildcards)
+  update() {}
+}
+```
+
+→ See the **[Authorization deep-dive guide](docs/authz.md)** for the full mental
+model, all four models, custom strategies, and the complete API reference.
 
 ## 📚 Modules
 
@@ -615,6 +643,218 @@ CREATE INDEX idx_outbox_events_due ON outbox_events (status, next_attempt_at);
 
 Failed publishes are retried with exponential backoff (defaults: 30s → 60s → 2m → 4m → ... capped at 1 hour). After 10 failed attempts the row transitions to `status='failed'` and is no longer retried automatically — surface these for operator inspection via a dashboard query on `WHERE status = 'failed'`.
 
+### 🛡️ Authorization (`@xlr8-nest/core/authz`)
+
+Declarative authorization for NestJS. One guard, one service, and a small set of
+decorators cover **four authorization models** — and any future model plugs in
+without touching the framework.
+
+> **Authorization, not authentication.** This module answers *"is this known
+> user allowed?"*. Keep your existing JWT/auth guard to answer *"who is this
+> user?"* — this framework reads the already-authenticated `request.user` via a
+> pluggable resolver.
+
+```typescript
+import {
+  AuthzModule,
+  AuthorizationService,
+  AuthorizationGuard,
+  RequireRoles,
+  RequirePermissions,
+  RequirePolicy,
+  RequireResource,
+  CheckOwnership,
+  Authorize,
+  Public,
+} from '@xlr8-nest/core/authz';
+```
+
+**The model — requirement + handler + principal:**
+
+| Concept | What it is | Example |
+| --- | --- | --- |
+| **Requirement** | a declarative demand attached to a route (object with a `type`) | "must have role `admin`" |
+| **Handler** | a strategy that evaluates one requirement `type` | `RolesHandler` → `type: 'roles'` |
+| **Principal** | the normalized authenticated subject | `{ id, roles, permissions, attributes }` |
+
+A decorator attaches requirements; the `AuthorizationGuard` resolves the
+principal and dispatches each requirement to its handler; the
+`AuthorizationService` exposes the same evaluation for imperative checks. **A new
+authorization model = one requirement + one handler + register it.** Nothing
+else changes.
+
+**Features:**
+
+- **RBAC** — `@RequireRoles('admin', 'manager', { mode: 'any' | 'all' })`
+- **Permission-based** — `@RequirePermissions('user:write', { mode })`, with
+  wildcard matching (`billing:*`, `user:*:read`)
+- **Policy-based** — named, reusable rules (requirements and/or a custom
+  predicate) registered via `AuthzModule.forRoot({ policies })`, applied with
+  `@RequirePolicy('CanManageBilling')`
+- **Resource / property-based** — `@CheckOwnership({ ownerField, bypassRoles,
+  load })` and `@RequireResource(evaluate, load?)`
+- **Imperative** — `AuthorizationService.authorize() / can() / checkAll()` for
+  checks inside command handlers and domain services
+- **Pluggable principal** — implement `PrincipalResolver` to source
+  roles/permissions from JWT claims (default), a DB lookup, or a remote service
+- **Global or per-route** — `registerGlobalGuard: true` (+ `@Public()` to opt
+  out), or `@UseGuards(AuthorizationGuard)` per controller
+- **Extensible** — add custom strategies (ABAC, time-window, tenant-scoped, ...)
+  with no framework changes
+
+**Setup:**
+
+```typescript
+import { Module } from '@nestjs/common';
+import { AuthzModule, RolesRequirement, PermissionsRequirement } from '@xlr8-nest/core/authz';
+
+@Module({
+  imports: [
+    AuthzModule.forRoot({
+      registerGlobalGuard: true, // gate every route; use @Public() to opt out
+      policies: [
+        {
+          name: 'CanManageBilling',
+          requirements: [
+            new RolesRequirement(['admin', 'billing-manager']), // any of
+            new PermissionsRequirement(['billing:write']),
+          ],
+        },
+      ],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+**Declarative usage:**
+
+```typescript
+import {
+  RequireRoles,
+  RequirePermissions,
+  RequirePolicy,
+  CheckOwnership,
+  Public,
+} from '@xlr8-nest/core/authz';
+
+@Controller('articles')
+export class ArticleController {
+  @Get('public')
+  @Public()                                    // bypass the guard entirely
+  publicList() {}
+
+  @Post()
+  @RequireRoles('editor', 'admin')             // RBAC — any of these roles
+  create() {}
+
+  @Get('reports')
+  @RequirePermissions('reports:view', 'reports:export') // all of (default mode)
+  reports() {}
+
+  @Post('invoices/:id/charge')
+  @RequirePolicy('CanManageBilling')           // named policy
+  charge() {}
+
+  @Patch(':id')
+  @CheckOwnership({                            // resource/ownership-based
+    ownerField: 'authorId',
+    bypassRoles: ['admin'],
+    load: (ctx) => articleRepo.findById((ctx.request as Request).params.id),
+  })
+  update() {}
+}
+```
+
+**Imperative usage (inside services / command handlers):**
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import {
+  AuthorizationService,
+  RolesRequirement,
+  ResourceRequirement,
+  type AuthorizationPrincipal,
+} from '@xlr8-nest/core/authz';
+
+@Injectable()
+export class ArticleService {
+  constructor(private readonly authz: AuthorizationService) {}
+
+  async publish(principal: AuthorizationPrincipal, article: Article) {
+    await this.authz.authorize(
+      principal,
+      [
+        new RolesRequirement(['editor', 'admin']),
+        new ResourceRequirement<Article>(
+          (p, a) => a.authorId === p.id || p.roles.includes('admin'),
+        ),
+      ],
+      { resource: article }, // pre-attach the resource
+    ); // throws ForbiddenError if not satisfied
+
+    article.status = 'published';
+  }
+}
+```
+
+**Custom strategy (no framework changes):**
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import {
+  Authorize,
+  AuthzModule,
+  type AuthorizationRequirement,
+  type RequirementHandler,
+} from '@xlr8-nest/core/authz';
+
+// 1. requirement (unique `type`)
+class TimeWindowRequirement implements AuthorizationRequirement<'time-window'> {
+  readonly type = 'time-window';
+  constructor(public readonly startUtc: number, public readonly endUtc: number) {}
+}
+
+// 2. handler (matches by requirementType)
+@Injectable()
+class TimeWindowHandler implements RequirementHandler<TimeWindowRequirement> {
+  readonly requirementType = 'time-window';
+  handle(req: TimeWindowRequirement): boolean {
+    const h = new Date().getUTCHours();
+    return h >= req.startUtc && h < req.endUtc;
+  }
+}
+
+// 3. register
+AuthzModule.forRoot({ handlers: [TimeWindowHandler] });
+
+// 4. (optional) decorator + use — composes with everything else
+const DuringBusinessHours = () => Authorize(new TimeWindowRequirement(8, 18));
+
+@Post('payouts')
+@RequireRoles('finance')
+@DuringBusinessHours()
+runPayouts() {}
+```
+
+**Behavior summary:**
+
+- A route with **no** authorization requirements is **allowed** — this guard
+  governs authorization, not authentication.
+- **No principal** but requirements present ⇒ `401 UnauthorizedError`.
+- A requirement **not satisfied** ⇒ `403 ForbiddenError`.
+- **Stacked decorators ⇒ logical AND**, short-circuiting on the first denial.
+- `@RequireRoles` defaults to `mode: 'any'`; `@RequirePermissions` defaults to
+  `mode: 'all'`.
+
+> ℹ️ `UserIdentity.roles` was widened from `string` to `string[]` to support
+> RBAC. The default `RequestUserResolver` still accepts a single string and
+> normalizes it to an array.
+
+📖 **Full guide:** [docs/authz.md](docs/authz.md) — mental model, request flow,
+every decorator/handler/type, recipes for all four models, the principal
+resolver, the extension recipe, and a complete API reference.
+
 ### 🚨 Errors (`@xlr8-nest/core/errors`)
 
 Standardized error classes that extend NestJS exceptions.
@@ -1002,6 +1242,7 @@ This package requires the following peer dependencies based on which modules you
 | **ddd**       | `@nestjs/common`, `@nestjs/core`, `rxjs`           | `@nestjs/event-emitter`      |
 | **database**  | `@nestjs/common`, `@nestjs/core`                   | `@nestjs/typeorm`, `typeorm` |
 | **messaging** | `@nestjs/common`, `@nestjs/core`, `@nestjs/typeorm`, `typeorm` | -                |
+| **authz**     | `@nestjs/common`, `@nestjs/core`                   | -                            |
 | **openapi**   | `@nestjs/common`                                   | `@nestjs/swagger`            |
 | **response**  | `@nestjs/common`                                   | -                            |
 | **validator** | `@nestjs/common`                                   | `zod`                        |
