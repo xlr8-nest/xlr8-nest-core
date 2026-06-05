@@ -1,3 +1,6 @@
+// Error catalogs
+export * from './errors';
+
 // Domain Core
 export * from './aggregate-root';
 export * from './domain-event';

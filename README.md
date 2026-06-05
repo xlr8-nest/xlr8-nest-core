@@ -91,21 +91,23 @@ import { DatabaseExtensionModule } from '@xlr8-nest/core/database';
   imports: [
     DatabaseExtensionModule.register({
       connection: {
-        type: 'postgres',
+        type: DatabaseType.POSTGRES,
         host: 'localhost',
         port: 5432,
         username: 'user',
         password: 'pass',
         database: 'mydb',
       },
+      entities: [UserOrm, ProductOrm],        // required — TypeORM entity classes or globs
       migration: {
         enabled: true,
-        autoRun: false,
+        autoRun: false,                        // true → runs on module init (throws on failure)
         migrationsPath: 'src/database/migrations',
       },
       seeder: {
         enabled: true,
-        seedersPath: 'src/database/seeders',
+        seeds: [UserSeeder, ProductSeeder],    // seeder classes (not a path string)
+        autoRun: false,
       },
     }),
   ],
@@ -326,29 +328,35 @@ import {
 **Example:**
 
 ```typescript
-// Unit of Work usage
+// Unit of Work — two methods only: transaction() and manager
 @Injectable()
 export class UserService {
-  constructor(@UnitOfWork() private readonly uow: IUnitOfWork) {}
+  constructor(@InjectUnitOfWork() private readonly uow: IUnitOfWork) {}
 
   async createUser(dto: CreateUserDto) {
-    const user = this.uow.getRepository(User).create(dto);
-    await this.uow.getRepository(User).save(user);
+    // Wrap writes in a transaction; both save calls share the same QueryRunner
+    return this.uow.transaction(async () => {
+      const user = this.uow.manager.create(User, dto);
+      await this.uow.manager.save(user);
+      return user;
+    });
+    // On success: commits. On error: rolls back. No manual commit/rollback needed.
+  }
 
-    // Transaction is automatically managed
-    await this.uow.commit();
-    return user;
+  async findById(id: string) {
+    // Outside a transaction, manager falls back to DataSource.manager (read-only safe)
+    return this.uow.manager.findOne(User, { where: { id } });
   }
 }
 
-// Create seeder
+// Seeder — extend BaseSeeder; use this.manager (injected from DataSource)
 export class UserSeeder extends BaseSeeder {
   async run() {
+    await this.clearTable('users'); // validates identifier before TRUNCATE
     const users = [
       { name: 'John', email: 'john@example.com' },
       { name: 'Jane', email: 'jane@example.com' },
     ];
-
     await this.manager.save(User, users);
   }
 }
@@ -857,7 +865,7 @@ resolver, the extension recipe, and a complete API reference.
 
 ### 🚨 Errors (`@xlr8-nest/core/errors`)
 
-Standardized error classes that extend NestJS exceptions.
+Standardized error classes that extend native `Error` (not NestJS `HttpException`). Use `GlobalExceptionFilter` from `@xlr8-nest/core/response` to map them to HTTP responses.
 
 ```typescript
 import {
@@ -870,20 +878,36 @@ import {
 } from '@xlr8-nest/core/errors';
 ```
 
-**Example:**
+Define a named error catalog per domain (never inline codes at throw sites):
 
 ```typescript
+// src/common/errors/user.errors.ts
+import type { ErrorType } from '@xlr8-nest/core/types';
+
+export const UserErrors = {
+  NotFound:      { code: 'USER-NOT_FOUND',     message: 'User not found.' },
+  EmailConflict: { code: 'USER-EMAIL_CONFLICT', message: 'This email is already in use.' },
+} as const satisfies Record<string, ErrorType>;
+```
+
+Then import and throw via the catalog:
+
+```typescript
+import { NotFoundError, ConflictError } from '@xlr8-nest/core/errors';
+import { UserErrors } from './common/errors/user.errors';
+
 @Injectable()
 export class UserService {
   async findById(id: string) {
     const user = await this.repository.findOne({ where: { id } });
-    if (!user) {
-      throw new NotFoundError({
-        code: 'USER_NOT_FOUND',
-        message: `User with id ${id} not found`,
-      });
-    }
+    if (!user) throw new NotFoundError(UserErrors.NotFound);
     return user;
+  }
+
+  async create(dto: CreateUserDto) {
+    const existing = await this.repository.findOne({ where: { email: dto.email } });
+    if (existing) throw new ConflictError(UserErrors.EmailConflict);
+    // ...
   }
 }
 ```

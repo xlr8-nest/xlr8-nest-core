@@ -15,6 +15,7 @@ import {
   AuthzGuardOptionsToken,
   PrincipalResolverToken,
 } from '../constants/metadata';
+import { AuthzErrors } from '../errors/authz.errors';
 import type { PrincipalResolver } from '../resolver/principal-resolver.interface';
 import { AuthorizationService } from '../services/authorization.service';
 import type { AuthorizationRequirement } from '../types/requirement.type';
@@ -71,17 +72,14 @@ export class AuthorizationGuard implements CanActivate {
 
     if (requirements.length === 0) {
       if (this.guardOptions.defaultDeny) {
-        throw new ForbiddenError({
-          code: 'FORBIDDEN',
-          message: 'No authorization policy declared for this route.',
-        });
+        throw new ForbiddenError(AuthzErrors.NoPolicy);
       }
       return true;
     }
 
     const principal = await this.principalResolver.resolve(context);
     if (!principal) {
-      throw new UnauthorizedError();
+      throw new UnauthorizedError(AuthzErrors.Unauthenticated);
     }
 
     const request = context.switchToHttp().getRequest<unknown>();
@@ -95,8 +93,8 @@ export class AuthorizationGuard implements CanActivate {
         `Authorization denied: type=${decision.failedRequirementType ?? 'unknown'} reason=${decision.reason ?? 'none'} principal=${principal.id}`,
       );
       throw new ForbiddenError({
-        code: 'FORBIDDEN',
-        message: decision.reason ?? 'Access denied.',
+        ...AuthzErrors.AccessDenied,
+        message: decision.reason ?? AuthzErrors.AccessDenied.message,
       });
     }
 

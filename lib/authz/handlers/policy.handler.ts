@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { POLICY_REQUIREMENT, PolicyRequirement } from '../requirements/policy.requirement';
 import { AuthorizationService } from '../services/authorization.service';
+import { AuthzErrors } from '../errors/authz.errors';
 import { PolicyRegistry } from '../services/policy-registry';
 import type { AuthorizationContext } from '../types/authorization-context.type';
 import type { AuthorizationDecision } from '../types/decision.type';
@@ -31,8 +32,8 @@ export class PolicyHandler implements RequirementHandler<PolicyRequirement> {
     const definition = this.registry.get(requirement.policy);
     if (!definition) {
       throw new Error(
-        `Unknown authorization policy "${requirement.policy}". ` +
-          `Register it via AuthzModule.forRoot({ policies: [...] }).`,
+        `[${AuthzErrors.UnknownPolicy.code}] ${AuthzErrors.UnknownPolicy.message} ` +
+          `Policy: "${requirement.policy}". Register it via AuthzModule.forRoot({ policies: [...] }).`,
       );
     }
 

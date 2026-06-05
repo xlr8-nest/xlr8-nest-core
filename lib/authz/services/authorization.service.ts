@@ -1,6 +1,7 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ForbiddenError } from '../../errors/forbidden.error';
 import { RequirementHandlerToken } from '../constants/metadata';
+import { AuthzErrors } from '../errors/authz.errors';
 import type { RequirementHandler } from '../handlers/requirement-handler.interface';
 import type { AuthorizationContext } from '../types/authorization-context.type';
 import type { AuthorizationDecision } from '../types/decision.type';
@@ -26,8 +27,8 @@ export class AuthorizationService {
     for (const handler of handlers) {
       if (this.handlersByType.has(handler.requirementType)) {
         throw new Error(
-          `Duplicate authorization handler for requirement type "${handler.requirementType}". ` +
-            `Each requirementType must have exactly one registered handler.`,
+          `[${AuthzErrors.DuplicateHandler.code}] ${AuthzErrors.DuplicateHandler.message} ` +
+            `Requirement type: "${handler.requirementType}".`,
         );
       }
       this.handlersByType.set(handler.requirementType, handler);
@@ -42,8 +43,8 @@ export class AuthorizationService {
     const handler = this.handlersByType.get(requirement.type);
     if (!handler) {
       throw new Error(
-        `No authorization handler registered for requirement type "${requirement.type}". ` +
-          `Register one via AuthzModule.forRoot({ handlers: [...] }).`,
+        `[${AuthzErrors.UnknownRequirementType.code}] ${AuthzErrors.UnknownRequirementType.message} ` +
+          `Requirement type: "${requirement.type}". Register a handler via AuthzModule.forRoot({ handlers: [...] }).`,
       );
     }
 
@@ -98,8 +99,8 @@ export class AuthorizationService {
     const decision = await this.checkAll(requirements, { ...context, principal });
     if (!decision.granted) {
       throw new ForbiddenError({
-        code: 'FORBIDDEN',
-        message: decision.reason ?? 'Access denied.',
+        ...AuthzErrors.AccessDenied,
+        message: decision.reason ?? AuthzErrors.AccessDenied.message,
       });
     }
   }

@@ -146,7 +146,7 @@ class Handler implements ICommandHandler<CreateUserCommand> { async execute(c){ 
 
 **Public exports.** `DatabaseExtensionModule` (+async options), `IUnitOfWork` (incl. `manager: EntityManager`)/`IUnitOfWorkToken` (Symbol), `TypeOrmClient`, `@InjectUnitOfWork`/`@UnitOfWork`, `MigrationService`/`SeederService`, command runners, `Seeder`/`BaseSeeder`/`BaseFactory`/`BaseOrm`, config builders (`createDataSource`/`toDatabaseModuleConfig`/`defineConfig`), config interfaces, `DATABASE_MODULE_CONFIG` token (Symbol).
 
-**Key abstractions.** `TypeOrmClient` (Unit of Work + Ambient Context; `.manager` primary, `.client` deprecated alias); `DatabaseExtensionModule` (Dynamic Module; fails fast on auto-migration/seed errors); migration/seeder services (Facade over `DataSource`); command runners (CLI Adapter); `BaseFactory`/`BaseSeeder` (Template Method + faker); `BaseOrm` (partial-constructor via `Object.assign`).
+**Key abstractions.** `TypeOrmClient` (Unit of Work + Ambient Context; `.manager` primary, `.client` deprecated alias); `DatabaseExtensionModule` (Dynamic Module; fails fast on auto-migration/seed errors); migration/seeder services (Facade over `DataSource`); command runners (CLI Adapter); `BaseSeeder` / `Seeder` (injects `DataSource`, exposes `this.manager`, `this.clearTable(tableName)`, no `manager` parameter on `run()`); `BaseFactory<T>` (Template Method with `@faker-js/faker`); `BaseOrm` (partial-constructor via `Object.assign`).
 
 **Extension points.** Custom seeders/factories/entities; alternate UoW impl (intended); async/unified config; CLI.
 
@@ -156,7 +156,7 @@ class Handler implements ICommandHandler<CreateUserCommand> { async execute(c){ 
 await this.uow.transaction(async () => { /* repo writes share the txn manager */ });
 ```
 
-**Notable risks.** **README example (`getRepository`/`commit`) is non-functional**. Seeder `all`/`each` transaction modes don't actually wrap the seeders. Auto-migrate/seed runs in every replica with no distributed lock. `nest-commander`/`@sqltools/formatter`/`@faker-js/faker` are optional peers but hard requirements for CLI features. `getPendingMigrations` returns a placeholder [P2]. CLI has no `bin` entry and prints literal `<prefix>` in help [P2]. No nested-transaction/savepoint support. Fixed: `IUnitOfWork` now exposes `manager: EntityManager` (no more cast); `IUnitOfWorkToken` and `DATABASE_MODULE_CONFIG` are now Symbols (no string-token collisions); auto-migrate/seed errors now rethrow (fail-fast); `clearTable` validates table names with `assertSafeIdentifier`; `registerAsync` accepts `migration`/`seeder` enable flags.
+**Notable risks.** Seeder `all`/`each` transaction modes don't actually wrap the seeders. Auto-migrate/seed runs in every replica with no distributed lock. `nest-commander`/`@sqltools/formatter`/`@faker-js/faker` are optional peers but hard requirements for CLI features. `getPendingMigrations` returns a placeholder [P2]. CLI has no `bin` entry and prints literal `<prefix>` in help [P2]. No nested-transaction/savepoint support. Fixed: `IUnitOfWork` now exposes `manager: EntityManager` (no more cast); `IUnitOfWorkToken` and `DATABASE_MODULE_CONFIG` are now Symbols (no string-token collisions); auto-migrate/seed errors now rethrow (fail-fast); `clearTable` validates table names with `assertSafeIdentifier`; `registerAsync` accepts `migration`/`seeder` enable flags.
 
 ---
 

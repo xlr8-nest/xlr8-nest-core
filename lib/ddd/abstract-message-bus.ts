@@ -1,6 +1,7 @@
 import { Logger, OnModuleInit, Type } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
 import { NotFoundError } from '../errors/not-found.error';
+import { DddErrors } from './errors/ddd.errors';
 
 /** Generic handler interface: `execute(message): Promise<TResult>`. */
 export interface IMessageHandler<TMessage, TResult = unknown> {
@@ -40,9 +41,13 @@ export abstract class AbstractMessageBus<TMessage> implements OnModuleInit {
     if (!handler) {
       const name = ctor.name;
       this.logger.error(`${this.messageKind} handler not found for "${name}"`);
+      const errorDef =
+        this.messageKind === 'Command'
+          ? DddErrors.CommandHandlerNotFound
+          : DddErrors.QueryHandlerNotFound;
       throw new NotFoundError({
-        code: `${this.messageKind.toUpperCase()}_HANDLER_NOT_FOUND`,
-        message: `No handler registered for ${this.messageKind} "${name}". Add a class decorated with @${this.messageKind}Handler(${name}).`,
+        ...errorDef,
+        message: `${errorDef.message} (${this.messageKind}: "${name}") — add a class decorated with @${this.messageKind}Handler(${name}).`,
       });
     }
 

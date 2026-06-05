@@ -1,4 +1,5 @@
 export * from './constants';
+export * from './errors';
 export * from './types';
 export * from './resolver';
 export * from './requirements';

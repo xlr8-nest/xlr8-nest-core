@@ -1,5 +1,6 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PoliciesToken } from '../constants/metadata';
+import { AuthzErrors } from '../errors/authz.errors';
 import type { AuthorizationContext } from '../types/authorization-context.type';
 import type { AuthorizationDecision } from '../types/decision.type';
 import type { AuthorizationRequirement } from '../types/requirement.type';
@@ -47,14 +48,17 @@ export class PolicyRegistry {
 
   register(policy: PolicyDefinition): void {
     if (this.policies.has(policy.name)) {
-      throw new Error(`Authorization policy "${policy.name}" is already registered.`);
+      throw new Error(
+        `[${AuthzErrors.DuplicatePolicy.code}] ${AuthzErrors.DuplicatePolicy.message} ` +
+          `Policy name: "${policy.name}".`,
+      );
     }
     const hasRequirements = Array.isArray(policy.requirements) && policy.requirements.length > 0;
     const hasEvaluator = typeof policy.evaluate === 'function';
     if (!hasRequirements && !hasEvaluator) {
       throw new Error(
-        `Authorization policy "${policy.name}" has neither requirements nor an evaluate predicate. ` +
-          `A policy must have at least one.`,
+        `[${AuthzErrors.EmptyPolicy.code}] ${AuthzErrors.EmptyPolicy.message} ` +
+          `Policy name: "${policy.name}".`,
       );
     }
     this.policies.set(policy.name, policy);

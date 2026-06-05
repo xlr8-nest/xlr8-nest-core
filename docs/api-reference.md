@@ -416,6 +416,55 @@ throw new BadRequestError(
 
 Available from `@xlr8-nest/core/response`. Returns `true` if `value` is an instance of `Error` that carries `statusCode` and `code` properties — reliably identifies `BaseError` instances across module boundaries using the brand symbol.
 
+#### Domain error catalogs — required pattern
+
+**Never inline `{ code, message }` literals at throw sites.** Always define a named error catalog for each domain module and import from it. This matches how `@xlr8-nest/core` itself defines its own internal error codes (`AuthzErrors`, `DddErrors`).
+
+```typescript
+// src/common/errors/user.errors.ts  (Layered)
+// src/shared/errors/user.errors.ts  (DDD/CQRS)
+import type { ErrorType } from '@xlr8-nest/core/types';
+
+export const UserErrors = {
+  NotFound:      { code: 'USER-NOT_FOUND',      message: 'User not found.' },
+  EmailConflict: { code: 'USER-EMAIL_CONFLICT',  message: 'A user with this email already exists.' },
+  Forbidden:     { code: 'USER-FORBIDDEN',       message: 'You do not have permission to access this user.' },
+} as const satisfies Record<string, ErrorType>;
+```
+
+**Naming convention:** `DOMAIN-SNAKE_CASE` — uppercase, hyphen separator between domain and description (e.g. `USER-NOT_FOUND`, `LEAVE-INSUFFICIENT_BALANCE`, `PRODUCT-INVALID_TRANSITION`).
+
+**Usage:**
+```typescript
+import { NotFoundError, ConflictError, ForbiddenError, UnprocessableEntityError } from '@xlr8-nest/core/errors';
+import { UserErrors } from '../../common/errors/user.errors';
+
+if (!user)   throw new NotFoundError(UserErrors.NotFound);
+if (taken)   throw new ConflictError(UserErrors.EmailConflict);
+if (!owner)  throw new ForbiddenError(UserErrors.Forbidden);
+if (!valid)  throw new UnprocessableEntityError(UserErrors.InvalidTransition);
+```
+
+**Built-in framework error catalogs** (exported from their subpaths):
+
+```typescript
+import { AuthzErrors } from '@xlr8-nest/core/authz'; // AUTHZ_* codes
+import { DddErrors }   from '@xlr8-nest/core/ddd';   // DDD_* codes
+```
+
+| Catalog | Code | Meaning |
+|---|---|---|
+| `AuthzErrors.Unauthenticated` | `AUTHZ_UNAUTHENTICATED` | No principal resolved (401) |
+| `AuthzErrors.AccessDenied` | `AUTHZ_ACCESS_DENIED` | Requirement denied (403) |
+| `AuthzErrors.NoPolicy` | `AUTHZ_NO_POLICY` | Route has no policy and defaultDeny=true (403) |
+| `AuthzErrors.UnknownRequirementType` | `AUTHZ_UNKNOWN_REQUIREMENT_TYPE` | No handler for requirement type |
+| `AuthzErrors.UnknownPolicy` | `AUTHZ_UNKNOWN_POLICY` | @RequirePolicy references unregistered policy |
+| `AuthzErrors.DuplicateHandler` | `AUTHZ_DUPLICATE_HANDLER` | Two handlers for same requirementType |
+| `AuthzErrors.DuplicatePolicy` | `AUTHZ_DUPLICATE_POLICY` | Two policies with same name |
+| `AuthzErrors.EmptyPolicy` | `AUTHZ_EMPTY_POLICY` | Policy has neither requirements nor evaluate |
+| `DddErrors.CommandHandlerNotFound` | `DDD_COMMAND_HANDLER_NOT_FOUND` | No @CommandHandler registered |
+| `DddErrors.QueryHandlerNotFound` | `DDD_QUERY_HANDLER_NOT_FOUND` | No @QueryHandler registered |
+
 ---
 
 ## 4. Edge Layer
@@ -1351,22 +1400,24 @@ import {
 ```typescript
 // Static config
 DatabaseExtensionModule.register({
-  type: 'postgres',
-  host: 'localhost',
-  port: 5432,
-  username: 'app',
-  password: 'secret',
-  database: 'mydb',
-  entities: [__dirname + '/**/*.orm.{js,ts}'],
+  connection: {
+    type: DatabaseType.POSTGRES,       // DatabaseType enum or plain string
+    host: 'localhost',
+    port: 5432,
+    username: 'app',
+    password: 'secret',
+    database: 'mydb',
+  },
+  entities: [UserOrm, ProductOrm],    // TypeORM entity classes or glob strings
   migration: {
     enabled: true,
-    autoRun: false,                    // run manually via CLI or MigrationService
-    directory: __dirname + '/migrations',
+    autoRun: false,                    // true → runs on module init, throws on failure
+    migrationsPath: __dirname + '/migrations',
   },
   seeder: {
     enabled: true,
     autoRun: false,
-    seeders: [UserSeeder, ProductSeeder],
+    seeds: [UserSeeder, ProductSeeder], // seeder classes (not path strings)
   },
 })
 
@@ -1375,12 +1426,14 @@ DatabaseExtensionModule.registerAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (cfg: ConfigService): DatabaseModuleConfig => ({
-    type: 'postgres',
-    url: cfg.get('DATABASE_URL'),
+    connection: {
+      type: DatabaseType.POSTGRES,
+      url: cfg.get('DATABASE_URL'),
+    },
     entities: [__dirname + '/**/*.orm.{js,ts}'],
     migration: { enabled: true, autoRun: cfg.get('DB_AUTO_MIGRATE') === 'true' },
   }),
-  migration: true,  // explicitly enable migration runner
+  migration: true,  // explicitly enable migration CLI runner
 })
 ```
 
@@ -1486,25 +1539,44 @@ export class UserOrm extends BaseOrm {
 
 ### `BaseSeeder` and `Seeder`
 
-```typescript
-abstract class BaseSeeder implements Seeder {
-  abstract run(manager: EntityManager): Promise<void>;
+`DataSource` is constructor-injected by the framework. `this.manager` is a getter on `Seeder` that returns `dataSource.manager`. There is **no** `manager` parameter — use `this.manager` and `this.clearTable()` directly.
 
-  protected clearTable(manager: EntityManager, tableName: string): Promise<void>
-  // tableName is validated against /^[a-zA-Z_][a-zA-Z0-9_.]*$/ before interpolation
+```typescript
+abstract class Seeder {
+  protected readonly dataSource: DataSource   // constructor-injected
+  protected get manager(): EntityManager       // dataSource.manager
+
+  abstract run(): Promise<void>                // implement this — no parameters
+
+  protected clearTable(tableName: string): Promise<void>
+  // tableName validated against /^[A-Za-z_][A-Za-z0-9_]*$/ before TRUNCATE
+
+  protected disableForeignKeyChecks(): Promise<void>  // PostgreSQL
+  protected enableForeignKeyChecks(): Promise<void>   // PostgreSQL
 }
+
+// BaseSeeder is just an alias — extend either one
+abstract class BaseSeeder extends Seeder {}
 ```
 
 **Usage:**
 ```typescript
-@Injectable()
 export class UserSeeder extends BaseSeeder {
-  async run(manager: EntityManager): Promise<void> {
-    await this.clearTable(manager, 'users');
-    await manager.insert(UserOrm, [
+  async run(): Promise<void> {              // no parameters
+    await this.clearTable('users');         // validates + TRUNCATE CASCADE
+    await this.manager.insert(UserOrm, [   // this.manager from base class
       { id: '1', email: 'admin@example.com', name: 'Admin' },
     ]);
   }
+}
+```
+
+Register seeders in `DatabaseExtensionModule` config:
+```typescript
+seeder: {
+  enabled: true,
+  seeds: [UserSeeder, RoleSeeder],   // order matters if FK deps exist
+  autoRun: false,
 }
 ```
 
