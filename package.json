@@ -1,6 +1,6 @@
 {
   "name": "@xlr8-nest/core",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "NestJS utility library with DDD, CQRS, TypeORM extensions, OpenAPI decorators, and Zod validation",
   "author": "",
   "license": "MIT",
