@@ -6,6 +6,26 @@ Declarative Zod-based request validation for NestJS controllers — validates `@
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+- [Core concepts](#core-concepts)
+  - [`@Validate(schema)`](#validateschema)
+  - [`ZodValidationPipe`](#zodvalidationpipe)
+  - [`validateInput(value, schema)` — outside pipes](#validateinputvalue-schema--outside-pipes)
+- [Error shape](#error-shape)
+- [Supported schema types](#supported-schema-types)
+- [Patterns & recipes](#patterns--recipes)
+  - [Route with body and query both validated](#route-with-body-and-query-both-validated-separate-schemas)
+  - [Schema with cross-field refinement](#schema-with-cross-field-refinement)
+  - [Reusable schema fragments](#reusable-schema-fragments)
+  - [Validation in a command handler](#validation-in-a-command-handler)
+  - [Validating partial updates (PATCH)](#validating-partial-updates-patch)
+- [Important rules / gotchas](#important-rules--gotchas)
+- [See also](#see-also)
+
+---
+
 ## Quick start
 
 ```bash

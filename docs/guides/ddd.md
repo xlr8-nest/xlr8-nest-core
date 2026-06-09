@@ -6,6 +6,35 @@ Aggregates, value objects, domain events, and message buses (CommandBus / QueryB
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+  - [1. Register CqrsModule in AppModule](#1-register-cqrsmodule-in-appmodule)
+  - [2. Define an aggregate](#2-define-an-aggregate)
+  - [3. Define a command and handler](#3-define-a-command-and-handler)
+  - [4. Dispatch from a controller](#4-dispatch-from-a-controller)
+  - [5. Register handlers in the feature module](#5-register-handlers-in-the-feature-module)
+- [Core concepts](#core-concepts)
+  - [Entity and AggregateRoot](#entity-and-aggregateroot)
+  - [ValueObject](#valueobject)
+  - [CompositeKey](#compositekey)
+- [Domain events](#domain-events)
+  - [Define an event](#define-an-event)
+  - [Handle an event](#handle-an-event)
+- [CQRS buses](#cqrs-buses)
+  - [QueryBus](#querybus)
+  - [Handling missing handlers](#handling-missing-handlers)
+- [Sagas](#sagas)
+- [EventBus teardown](#eventbus-teardown)
+- [Patterns and recipes](#patterns-and-recipes)
+  - [Domain error catalog for a feature](#domain-error-catalog-for-a-feature)
+  - [Events-only module](#events-only-module-no-commandquery-buses)
+  - [DomainService for stateless invariants](#domainservice-for-stateless-invariants)
+- [Gotchas](#gotchas)
+- [See Also](#see-also)
+
+---
+
 ## Quick start
 
 ### 1. Register CqrsModule in AppModule

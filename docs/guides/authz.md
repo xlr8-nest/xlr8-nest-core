@@ -6,6 +6,32 @@ Declarative, extensible authorization for NestJS — RBAC, permissions, policies
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+  - [1. Register the module](#1-register-the-module)
+  - [2. Protect a route](#2-protect-a-route)
+  - [3. JwtAuthGuard must run first](#3-jwtauthguard-must-run-first)
+- [Core model](#core-model)
+  - [`@RequireRoles`](#requireroles)
+  - [`@RequirePermissions`](#requirepermissions)
+  - [`@RequirePolicy`](#requirepolicy)
+  - [`@CheckOwnership` / `@RequireResource`](#checkownershiip--requireresource)
+- [Defining policies](#defining-policies)
+- [Imperative checks](#imperative-checks)
+- [`defaultDeny` in production](#defaultdeny-in-production)
+- [Custom strategy recipe](#custom-strategy-recipe)
+- [AuthzErrors catalog](#authzerrors-catalog)
+- [Patterns & recipes](#patterns--recipes)
+  - [Combining decorators (logical AND)](#combining-decorators-logical-and)
+  - [`@Authorize` — low-level primitive](#authorize--low-level-primitive)
+  - [Custom principal resolver](#custom-principal-resolver)
+  - [Permission utilities for manual checks](#permission-utilities-for-manual-checks)
+- [Important rules / gotchas](#important-rules--gotchas)
+- [See also](#see-also)
+
+---
+
 ## Quick start
 
 ### 1. Register the module

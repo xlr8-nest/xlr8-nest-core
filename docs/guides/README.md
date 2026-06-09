@@ -6,6 +6,8 @@ Quick-start guides for each module. Start here if you are new to the library.
 
 | Module | Import | Purpose |
 |---|---|---|
+| [Constants & Utils](./constants.md) | `@xlr8-nest/core/constants` · `@xlr8-nest/core/utils` | `StatusCode` enum, `CommonErrors` table, `validateInput` |
+| [Types](./types.md) | `@xlr8-nest/core/types` | Response envelope, `ErrorType`, `ErrorDetails`, `UserIdentity` |
 | [Errors](./errors.md) | `@xlr8-nest/core/errors` | Framework-agnostic error classes + domain error catalog pattern |
 | [Response](./response.md) | `@xlr8-nest/core/response` | Success/error response builders + GlobalExceptionFilter |
 | [Validator](./validator.md) | `@xlr8-nest/core/validator` | Zod validation with NestJS pipes |
@@ -26,10 +28,12 @@ Quick-start guides for each module. Start here if you are new to the library.
 
 New to the library? Read in this order:
 
-1. [Errors](./errors.md) — every project uses these; understand the catalog pattern first.
-2. [Response](./response.md) — wire GlobalExceptionFilter before writing any controllers.
-3. [Validator](./validator.md) — replace class-validator with Zod schemas.
-4. [Authorization](./authz.md) — add @RequireRoles / @Public() to your routes.
-5. [Database](./database.md) — use IUnitOfWork for transactional writes.
-6. [DDD / CQRS](./ddd.md) — only if your service has complex domain logic.
-7. [Messaging](./messaging.md) — only if you need reliable cross-service events.
+1. [Constants & Utils](./constants.md) — `StatusCode` and `CommonErrors` appear everywhere; know what they are.
+2. [Types](./types.md) — understand the response envelope shape and `ErrorType` contract before writing any code.
+3. [Errors](./errors.md) — every project uses these; understand the catalog pattern.
+4. [Response](./response.md) — wire `GlobalExceptionFilter` before writing any controllers.
+5. [Validator](./validator.md) — replace class-validator with Zod schemas.
+6. [Authorization](./authz.md) — add `@RequireRoles` / `@Public()` to your routes.
+7. [Database](./database.md) — use `IUnitOfWork` for transactional writes.
+8. [DDD / CQRS](./ddd.md) — only if your service has complex domain logic.
+9. [Messaging](./messaging.md) — only if you need reliable cross-service events.

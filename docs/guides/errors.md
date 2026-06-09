@@ -6,6 +6,27 @@ Typed HTTP error classes that carry a stable machine-readable `code`, a human-re
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+- [Error catalog pattern](#error-catalog-pattern)
+  - [Creating a catalog](#creating-a-catalog)
+  - [Code naming convention](#code-naming-convention)
+  - [Using catalog entries at throw sites](#using-catalog-entries-at-throw-sites)
+- [Built-in error classes](#built-in-error-classes)
+  - [400 vs 409 vs 422](#400-vs-409-vs-422)
+- [Field-level errors](#field-level-errors)
+- [Custom error subclasses](#custom-error-subclasses)
+- [Integration with GlobalExceptionFilter](#integration-with-globalexceptionfilter)
+- [Patterns and recipes](#patterns-and-recipes)
+  - [Service method with multiple error conditions](#service-method-with-multiple-error-conditions)
+  - [Cross-realm / multi-bundle detection](#cross-realm--multi-bundle-detection)
+  - [Typing a catalog with a generic TCode](#typing-a-catalog-with-a-generic-tcode)
+- [Gotchas](#gotchas)
+- [See Also](#see-also)
+
+---
+
 ## Quick start
 
 ```typescript

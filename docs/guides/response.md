@@ -6,6 +6,30 @@ Builds standard success/error envelopes and provides a global exception filter t
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+  - [1. Register the filter](#1-register-the-filter)
+  - [2. Return a success response from a controller](#2-return-a-success-response-from-a-controller)
+- [Core concepts](#core-concepts)
+  - [The response envelope](#the-response-envelope)
+  - [Evaluation chain in the filter](#evaluation-chain-in-the-filter)
+  - [Type aliases](#type-aliases)
+- [`buildSuccessResponse`](#buildsuccessresponse)
+- [`buildErrorResponse` and `normalizeUnknownException`](#builderrorresponse-and-normalizeunknownexception)
+  - [`normalizeUnknownException`](#normalizeunknownexception)
+  - [`buildErrorResponse`](#builderrorresponse)
+- [Custom error factory](#custom-error-factory)
+- [Patterns & recipes](#patterns--recipes)
+  - [Domain error catalog (required pattern)](#domain-error-catalog-required-pattern)
+  - [Field-level validation errors](#field-level-validation-errors)
+  - [Type-guarding unknown values in a custom filter](#type-guarding-unknown-values-in-a-custom-filter)
+  - [Typed controller returns](#typed-controller-returns)
+- [Gotchas](#gotchas)
+- [See also](#see-also)
+
+---
+
 ## Quick start
 
 ### 1. Register the filter

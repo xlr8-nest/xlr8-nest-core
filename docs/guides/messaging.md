@@ -6,6 +6,33 @@ Transactional outbox pattern: persist integration events inside your database tr
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+  - [1. Register MessagingModule](#1-register-messagingmodule)
+  - [2. Define an IntegrationEvent](#2-define-an-integrationevent)
+  - [3. Write a translator](#3-write-a-translator)
+  - [4. Publish from a command handler](#4-publish-from-a-command-handler)
+- [How the outbox works](#how-the-outbox-works)
+- [Core concepts](#core-concepts)
+  - [IntegrationEvent](#integrationevent)
+  - [IDomainEventTranslator](#idomaineventtranslator)
+  - [OutboxPublisher](#outboxpublisher)
+- [OutboxWorker options](#outboxworker-options)
+- [Implementing IMessagePublisher](#implementing-imessagepublisher)
+- [Required migration](#required-migration)
+  - [Generated DDL (for reference)](#generated-ddl-for-reference)
+- [OutboxAdminService](#outboxadminservice)
+- [CLI commands](#cli-commands)
+- [Patterns & recipes](#patterns--recipes)
+  - [One translator per aggregate family](#one-translator-per-aggregate-family)
+  - [Disable the worker in CLI processes](#disable-the-worker-in-cli-processes)
+  - [Health check endpoint](#health-check-endpoint)
+- [Gotchas](#gotchas)
+- [See also](#see-also)
+
+---
+
 ## Quick start
 
 ### 1. Register MessagingModule

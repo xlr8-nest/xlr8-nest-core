@@ -1,15 +1,28 @@
 # @xlr8-nest/core — Documentation
 
-Engineering documentation for the `@xlr8-nest/core` library: how it is built, and how it should evolve.
+## Quick navigation
 
-## Contents
+| You want to… | Start here |
+|---|---|
+| Use a module in your app | [guides/README.md](guides/README.md) — consumer guides (one per module) |
+| Understand how something works internally | [developer/README.md](developer/README.md) — internals + extension recipes |
+| Extend or contribute to the library | [developer/README.md](developer/README.md) |
+| Check the architecture & dependency graph | [architecture/overview.md](architecture/overview.md) |
+| Review known risks and tech debt | [maintenance/improvement-plan.md](maintenance/improvement-plan.md) |
 
-| Doc | Purpose |
-| --- | --- |
-| [architecture/overview.md](architecture/overview.md) | System architecture, design patterns, internal dependency graph, module-init & request lifecycles |
-| [architecture/modules.md](architecture/modules.md) | Per-module deep reference: responsibilities, public exports, key abstractions, extension points, usage |
-| [maintenance/improvement-plan.md](maintenance/improvement-plan.md) | **Long-term improvement & maintenance plan** — prioritized risks (security, correctness, packaging, scalability, coupling, DX), technical debt, missing features, and a phased refactoring roadmap |
-| [authz.md](authz.md) | Authorization framework guide (`@xlr8-nest/core/authz`) |
+---
+
+## All documents
+
+| Doc | Audience | Purpose |
+| --- | --- | --- |
+| [guides/README.md](guides/README.md) | **App developers** | Quick-start guides for all 10 modules — how to register, use, and configure each one |
+| [developer/README.md](developer/README.md) | **Library contributors / advanced users** | Build setup, per-module internals (mechanisms + flows), extension cookbook (custom handlers, publishers, translators, resolvers, new modules) |
+| [architecture/overview.md](architecture/overview.md) | Both | System architecture, design patterns, internal dependency graph, lifecycle diagrams |
+| [architecture/modules.md](architecture/modules.md) | Both | Per-module deep reference: responsibilities, public exports, key abstractions, extension points |
+| [authz.md](authz.md) | App developers | Detailed authorization framework guide |
+| [api-reference.md](api-reference.md) | Both | Complete public API signatures |
+| [maintenance/improvement-plan.md](maintenance/improvement-plan.md) | Contributors | Prioritized risks, tech debt, and phased refactoring roadmap |
 
 ## How this was produced
 

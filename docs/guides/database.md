@@ -6,6 +6,35 @@ Provides a TypeORM-backed `IUnitOfWork` abstraction, migration and seeder orches
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+  - [1. Register the module](#1-register-the-module)
+  - [2. Inject and use `IUnitOfWork`](#2-inject-and-use-iunitofwork)
+- [Core concepts](#core-concepts)
+  - [`IUnitOfWork`](#iunitofwork)
+  - [Inject decorators](#inject-decorators)
+- [`DatabaseModuleConfig` reference](#databasemoduleconfig-reference)
+- [`BaseOrm` — entity partial-construction](#baseorm--entity-partial-construction)
+- [Unified config (`defineConfig` / `toDatabaseModuleConfig`)](#unified-config-defineconfig--todatabasemoduleconfig)
+- [Migrations](#migrations)
+  - [Enable and configure](#enable-and-configure)
+  - [CLI commands](#cli-commands)
+  - [Injecting `MigrationService` programmatically](#injecting-migrationservice-programmatically)
+- [Seeders](#seeders)
+  - [Define a seeder](#define-a-seeder)
+  - [Register seeders](#register-seeders)
+  - [Run via CLI](#run-via-cli)
+- [`BaseFactory` — test and seed data](#basefactory--test-and-seed-data)
+  - [Define a factory](#define-a-factory)
+  - [Use in a seeder](#use-in-a-seeder)
+  - [Use in tests](#use-in-tests)
+- [Patterns and recipes](#patterns-and-recipes)
+- [Gotchas](#gotchas)
+- [See also](#see-also)
+
+---
+
 ## Quick start
 
 ### 1. Register the module

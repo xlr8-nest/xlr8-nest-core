@@ -4,6 +4,32 @@ Composite Swagger decorators that document HTTP operations and standard response
 
 ---
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+- [Core concepts](#core-concepts)
+  - [The standard response envelope](#the-standard-response-envelope)
+  - [Decorator composition](#decorator-composition)
+  - [Error decorators are additive](#error-decorators-are-additive)
+- [Verb decorators](#verb-decorators)
+  - [Signatures](#signatures)
+  - [Examples](#examples)
+- [Paginated responses](#paginated-responses)
+- [Error decorators](#error-decorators)
+  - [Shorthand decorators](#shorthand-decorators)
+  - [`includeErrors` — field-level validation errors](#includeerrors--field-level-validation-errors)
+  - [Custom error code](#custom-error-code)
+  - [`@ApiError` — custom status codes](#apierror--custom-status-codes)
+- [Patterns & recipes](#patterns--recipes)
+  - [Full CRUD controller with error catalog](#full-crud-controller-with-error-catalog)
+  - [Raw response (no envelope)](#raw-response-no-envelope)
+  - [Custom envelope via `wrapper`](#custom-envelope-via-wrapper)
+- [Low-level building blocks](#low-level-building-blocks)
+- [Important rules / gotchas](#important-rules--gotchas)
+- [See also](#see-also)
+
+---
+
 ## Quick start
 
 Install the peer dependency if you haven't already:
